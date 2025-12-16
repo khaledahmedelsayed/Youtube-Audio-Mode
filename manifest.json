@@ -1,0 +1,62 @@
+{
+    "manifest_version": 3,
+    "name": "YouTube Audio Mode",
+    "version": "1.0",
+    "version_name": "1.0.0",
+    "description": "Play YouTube videos in audio-only mode to save bandwidth and reduce internet usage",
+    "homepage_url": "https://github.com/Ahmed/youtube-audio-mode",
+    "permissions": [
+        "storage",
+        "activeTab",
+        "scripting"
+    ],
+    "host_permissions": [
+        "https://www.youtube.com/watch*"
+    ],
+    "action": {
+        "default_popup": "popup.html",
+        "default_icon": {
+            "16": "icons/icon16.png",
+            "32": "icons/icon32.png",
+            "48": "icons/icon48.png",
+            "128": "icons/icon128.png"
+        }
+    },
+    "background": {
+        "service_worker": "background.js"
+    },
+    "commands": {
+        "toggle-audio-mode": {
+            "suggested_key": {
+                "default": "Alt+Shift+A",
+                "mac": "Alt+Shift+A",
+                "windows": "Alt+Shift+A",
+                "linux": "Alt+Shift+A"
+            },
+            "description": "Toggle Audio Mode"
+        }
+    },
+    "content_scripts": [
+        {
+            "matches": [
+                "https://www.youtube.com/watch*"
+            ],
+            "js": [
+                "content.js"
+            ],
+            "css": [
+                "overlay.css"
+            ],
+            "run_at": "document_idle"
+        }
+    ],
+    "icons": {
+        "16": "icons/icon16.png",
+        "32": "icons/icon32.png",
+        "48": "icons/icon48.png",
+        "128": "icons/icon128.png"
+    },
+    "content_security_policy": {
+        "extension_pages": "script-src 'self'; object-src 'self'"
+    }
+}

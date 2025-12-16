@@ -1,0 +1,126 @@
+/* YouTube Audio Mode - Overlay Styles */
+
+#youtube-audio-mode-overlay {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  z-index: 999;
+  color: white;
+  margin: 0 !important;
+  padding: 0 !important;
+  transition: background 0.5s ease;
+}
+
+#youtube-audio-mode-overlay.has-image::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: -1;
+}
+
+.audio-mode-content {
+  text-align: center;
+  animation: fadeIn 0.5s ease-in;
+  z-index: 2;
+}
+
+.audio-mode-content svg {
+  margin-bottom: 20px;
+  opacity: 0.9;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.audio-mode-content h2 {
+  font-size: 28px;
+  font-weight: 700;
+  margin: 0 0 10px 0;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+}
+
+.audio-mode-content p {
+  font-size: 16px;
+  opacity: 0.9;
+  margin: 0 0 30px 0;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+
+.audio-visualizer {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  align-items: flex-end;
+  height: 40px;
+}
+
+.audio-visualizer .bar {
+  width: 4px;
+  background: white;
+  border-radius: 4px;
+  animation: wave 1s ease-in-out infinite;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+}
+
+/* Pause animation when video is paused */
+.audio-visualizer.paused .bar {
+  animation-play-state: paused;
+  height: 10px;
+}
+
+.audio-visualizer .bar:nth-child(1) {
+  animation-delay: 0s;
+}
+.audio-visualizer .bar:nth-child(2) {
+  animation-delay: 0.1s;
+}
+.audio-visualizer .bar:nth-child(3) {
+  animation-delay: 0.2s;
+}
+.audio-visualizer .bar:nth-child(4) {
+  animation-delay: 0.3s;
+}
+.audio-visualizer .bar:nth-child(5) {
+  animation-delay: 0.4s;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+}
+
+@keyframes wave {
+  0%,
+  100% {
+    height: 10px;
+  }
+  50% {
+    height: 30px;
+  }
+}

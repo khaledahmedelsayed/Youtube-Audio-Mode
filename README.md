@@ -1,4 +1,4 @@
-![YouTube Audio Mode](promo_images/marquee_promo.png)
+<!-- ![YouTube Audio Mode](promo_images/marquee_promo.png) -->
 
 # YouTube Audio Mode
 
@@ -8,7 +8,7 @@ YouTube Audio Mode is a lightweight Chrome extension that transforms your YouTub
 
 ## ✨ Key Features
 
-- **🎧 One-Click Audio Mode:** Toggle audio-only playback instantly with a simple switch or keyboard shortcut (`Alt+Shift+A`).
+- **🎧 One-Click Audio Mode:** Toggle audio-only playback instantly with a simple switch or keyboard shortcut (`Alt+Shift+A`) for Windows and `Option+Shift+A` for macOS.
 - **📉 Smart Data Saving:** Automatically sets video quality to **144p** to minimize bandwidth consumption while keeping audio clear.
 - **📊 Usage Statistics:** Track exactly how much data you've saved compared to 720p/1080p, along with your total listening time.
 - **🎵 Audio Visualizer:** A stunning, animated visualizer replaces the blank video screen.
@@ -39,7 +39,7 @@ _Link coming soon once the review process is complete!_
 
 ## ⌨️ Shortcuts
 
-- **Toggle Audio Mode:** `Alt` + `Shift` + `A`
+- **Toggle Audio Mode:** `Alt` + `Shift` + `A` for Windows and `Option` + `Shift` + `A` for macOS.
 
 ## 📊 Statistics & Privacy
 

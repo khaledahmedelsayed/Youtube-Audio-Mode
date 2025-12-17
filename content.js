@@ -394,12 +394,6 @@ function startUsageTracking() {
             return;
         }
 
-        // Skip all tracking if page is hidden (Page Visibility API)
-        if (document.hidden) {
-            console.log('[Audio Mode] Page hidden, skipping tracking cycle');
-            return;
-        }
-
         const video = getVideoElement();
         // Check if video exists and audio mode is actually enabled
         if (!audioModeEnabled || !video) return;

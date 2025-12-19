@@ -629,13 +629,11 @@ function createAudioModeOverlay() {
         // Listen for play event
         video.addEventListener('play', () => {
             visualizer.classList.remove('paused');
-            console.log('[Audio Mode] Video playing - animation resumed');
         });
 
         // Listen for pause event
         video.addEventListener('pause', () => {
             visualizer.classList.add('paused');
-            console.log('[Audio Mode] Video paused - animation stopped');
         });
     }
 }

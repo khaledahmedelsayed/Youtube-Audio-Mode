@@ -1,8 +1,8 @@
 {
     "manifest_version": 3,
     "name": "YouTube Audio Mode",
-    "version": "1.0",
-    "version_name": "1.0.0",
+    "version": "1.0.1",
+    "version_name": "1.0.1",
     "description": "Play YouTube videos in audio-only mode to save bandwidth and reduce internet usage",
     "homepage_url": "https://github.com/Ahmed/youtube-audio-mode",
     "permissions": [

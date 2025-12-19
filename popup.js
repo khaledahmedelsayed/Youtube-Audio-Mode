@@ -214,23 +214,67 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
     }
 });
 
-// Display correct shortcut based on OS
-chrome.runtime.getPlatformInfo((info) => {
-    const keysContainer = document.querySelector('.keys');
-    if (keysContainer) {
-        if (info.os === 'mac') {
-            keysContainer.innerHTML = '<kbd>Option</kbd> + <kbd>Shift</kbd> + <kbd>A</kbd>';
-        } else {
-            keysContainer.innerHTML = '<kbd>Alt</kbd> + <kbd>Shift</kbd> + <kbd>A</kbd>';
-        }
+// Display and Manage Shortcuts
+function updateShortcutDisplay() {
+    const keysContainer = document.getElementById('shortcut-display');
+    if (!keysContainer) return;
+
+    // Helper to setup click handler
+    const setupClickable = () => {
+        keysContainer.classList.add('clickable');
+        keysContainer.title = 'Click to configure extension shortcuts';
+        keysContainer.onclick = () => {
+            chrome.tabs.create({ url: 'chrome://extensions/shortcuts' });
+        };
+    };
+
+    if (!chrome.commands) {
+        // Fallback for contexts where chrome.commands isn't available
+        chrome.runtime.getPlatformInfo((info) => {
+            if (info.os === 'mac') {
+                keysContainer.innerHTML = '<kbd>Option</kbd> + <kbd>Shift</kbd> + <kbd>A</kbd>';
+            } else {
+                keysContainer.innerHTML = '<kbd>Alt</kbd> + <kbd>Shift</kbd> + <kbd>A</kbd>';
+            }
+        });
+        return;
     }
-});
+
+    chrome.commands.getAll((commands) => {
+        const toggleCommand = commands.find(c => c.name === 'toggle-audio-mode');
+
+        if (toggleCommand && toggleCommand.shortcut) {
+            chrome.runtime.getPlatformInfo((info) => {
+                let shortcutDisplay = toggleCommand.shortcut;
+
+                // Customize for Mac: "Option" instead of "Alt"
+                if (info.os === 'mac') {
+                    shortcutDisplay = shortcutDisplay.replace('Alt', 'Option');
+                }
+
+                // Shortcut is set, display it
+                const parts = shortcutDisplay.split('+');
+                const html = parts.map(part => `<kbd>${part.trim()}</kbd>`).join(' + ');
+                keysContainer.innerHTML = html;
+            });
+        } else {
+            // No shortcut set
+            keysContainer.innerHTML = '<span class="set-shortcut-link">⚠️ Click to set shortcut</span>';
+        }
+
+        // ALWAYS make it clickable/configurable
+        setupClickable();
+    });
+}
+
+// Initial call
+updateShortcutDisplay();
 
 // --- Settings Panel Logic ---
 
 const settingsBtn = document.getElementById('settings-btn');
-const closeSettingsBtn = document.getElementById('close-settings');
 const settingsPanel = document.getElementById('settings-panel');
+const closeSettingsBtn = document.getElementById('close-settings');
 const colorOptions = document.getElementById('color-options');
 const imageOptions = document.getElementById('image-options');
 const toggleBtns = document.querySelectorAll('.toggle-btn');

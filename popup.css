@@ -198,6 +198,25 @@ kbd {
   box-shadow: 0 2px 0 rgba(0, 0, 0, 0.2);
 }
 
+/* Shortcuts Link State */
+.keys.clickable {
+  cursor: pointer;
+  transition: all 0.2s;
+  background: rgba(255, 171, 0, 0.1); /* Amber tint for warning */
+  border-color: rgba(255, 171, 0, 0.3);
+}
+
+.keys.clickable:hover {
+  background: rgba(255, 171, 0, 0.2);
+  transform: translateY(-1px);
+}
+
+.set-shortcut-link {
+  color: #ffab00; /* Amber warning color */
+  font-weight: 500;
+  font-size: 11px;
+}
+
 /* Stats Header & Toggle */
 .stats-header-row {
   display: flex;

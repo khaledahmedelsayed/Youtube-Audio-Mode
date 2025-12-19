@@ -22,7 +22,8 @@ const DATA_RATES_MB_PER_MIN = {
 
 const QUALITY = {
     TARGET: 'tiny',  // 144p
-    FALLBACK: 'small'
+    FALLBACK: 'small',
+    RESTORE: 'hd720' // 720p
 };
 
 // ===== STATE VARIABLES =====
@@ -92,8 +93,6 @@ function enableAudioMode() {
     // Find the video player
     const video = getVideoElement();
     if (!video) {
-        console.log('No video found yet, waiting...');
-        // Wait for video to load and try again
         setTimeout(enableAudioMode, TIMING.RETRY_DELAY);
         return;
     }
@@ -110,14 +109,9 @@ function enableAudioMode() {
     // This makes the transition much smoother
     const setQualityWhenReady = () => {
         if (video.readyState >= 2 && !video.paused) {
-            // Video is playing, now we can safely set quality
-            console.log('[Audio Mode] Video is playing, setting quality now');
             setLowestQuality();
         } else {
-            // Video not playing yet, wait for it
             const playListener = () => {
-                console.log('[Audio Mode] Video started playing, will set quality shortly');
-                // Small delay to let playback stabilize
                 setTimeout(() => {
                     setLowestQuality();
                 }, TIMING.QUALITY_SET_DELAY);
@@ -128,7 +122,6 @@ function enableAudioMode() {
             // Also try after a timeout as fallback
             setTimeout(() => {
                 if (audioModeEnabled) {
-                    console.log('[Audio Mode] Setting quality via fallback timeout');
                     setLowestQuality();
                 }
             }, TIMING.FALLBACK_TIMEOUT);
@@ -142,7 +135,6 @@ function enableAudioMode() {
         try {
             chrome.storage.sync.set({ audioMode: true });
         } catch (error) {
-            console.log('[Audio Mode] Could not save state:', error);
         }
     }
 
@@ -159,6 +151,15 @@ function disableAudioMode() {
         video.style.opacity = '1';
         video.style.maxHeight = '';
         video.style.minHeight = '';
+    }
+
+    // Restore quality settings
+    restoreQuality();
+
+    // Reset quality attempt flag so we try fresh next time
+    const player = document.getElementById('movie_player');
+    if (player) {
+        delete player.__audioModeQualityAttempted;
     }
 
     // Remove overlay
@@ -189,14 +190,12 @@ function disableAudioMode() {
 /**
  * Function to interact with YouTube's quality settings UI (invisibly)
  * @param {HTMLVideoElement} video - The video element
+ * @param {string} targetText - The text to look for (e.g. '144p', '720p', 'Auto')
  */
-const clickQualitySetting = (video) => {
+const clickQualitySetting = (video, targetText = '144p') => {
     try {
-        // Save playback state before UI interaction
         const wasPlaying = !video.paused;
         const currentTime = video.currentTime;
-
-        console.log('[Audio Mode] Starting invisible UI interaction...');
 
         // Hide the settings panel from view
         const settingsPanel = document.querySelector('.ytp-settings-menu');
@@ -227,13 +226,10 @@ const clickQualitySetting = (video) => {
             popup.style.pointerEvents = 'none';
         }
 
-        // Open settings menu (now invisible)
         const settingsButton = document.querySelector('.ytp-settings-button');
         if (settingsButton) {
             settingsButton.click();
-            console.log('[Audio Mode] Clicked settings button (hidden)');
 
-            // Wait for menu to open, then click quality option
             setTimeout(() => {
                 const qualityMenuItem = Array.from(document.querySelectorAll('.ytp-menuitem')).find(
                     item => item.textContent.toLowerCase().includes('quality')
@@ -241,23 +237,26 @@ const clickQualitySetting = (video) => {
 
                 if (qualityMenuItem) {
                     qualityMenuItem.click();
-                    console.log('[Audio Mode] Clicked quality menu item (hidden)');
 
-                    // Wait for quality menu to open, then select 144p
                     setTimeout(() => {
-                        const quality144p = Array.from(document.querySelectorAll('.ytp-menuitem')).find(
-                            item => item.textContent.includes('144p')
-                        );
+                        const menuItems = Array.from(document.querySelectorAll('.ytp-menuitem'));
+                        const targetOption = menuItems.find(item => item.textContent.includes(targetText));
 
-                        if (quality144p) {
-                            quality144p.click();
-                            console.log('[Audio Mode] Successfully clicked 144p option (hidden)');
+                        if (targetOption) {
+                            targetOption.click();
                         } else {
-                            // If 144p not available, try the lowest available
-                            const allQualities = document.querySelectorAll('.ytp-menuitem');
-                            if (allQualities.length > 0) {
-                                allQualities[allQualities.length - 1].click();
-                                console.log('[Audio Mode] Clicked lowest available quality (hidden)');
+                            if (targetText === '144p') {
+                                const allQualities = document.querySelectorAll('.ytp-menuitem');
+                                if (allQualities.length > 0) {
+                                    allQualities[allQualities.length - 1].click();
+                                }
+                            }
+                            // If we were looking for 720p (restore), maybe try Auto?
+                            else if (targetText === '720p') {
+                                const autoOption = menuItems.find(item => item.textContent.includes('Auto'));
+                                if (autoOption) {
+                                    autoOption.click();
+                                }
                             }
                         }
 
@@ -288,11 +287,7 @@ const clickQualitySetting = (video) => {
                                     popup.style.pointerEvents = originalPopupStyles.pointerEvents || '';
                                 }
 
-                                console.log('[Audio Mode] Completed invisible quality change');
-
-                                // Restore playback state after menu interaction
                                 if (wasPlaying && video.paused) {
-                                    console.log('[Audio Mode] Restoring playback...');
                                     video.currentTime = currentTime;
                                     video.play().catch(err => console.log('[Audio Mode] Could not resume:', err));
                                 }
@@ -312,6 +307,11 @@ const clickQualitySetting = (video) => {
  * @param {HTMLElement} player - The YouTube player element
  * @param {HTMLVideoElement} video - The video element
  */
+/**
+ * Function to force set quality to 144p using multiple methods
+ * @param {HTMLElement} player - The YouTube player element
+ * @param {HTMLVideoElement} video - The video element
+ */
 const forceLowestQuality = (player, video) => {
     try {
         // Save the current playback state
@@ -320,63 +320,140 @@ const forceLowestQuality = (player, video) => {
 
         // Method 1: Try the standard API methods
         const availableLevels = player.getAvailableQualityLevels ? player.getAvailableQualityLevels() : [];
-        console.log('[Audio Mode] Available quality levels:', availableLevels);
 
         if (player.setPlaybackQuality) {
             player.setPlaybackQuality('tiny');
-            console.log('[Audio Mode] Called setPlaybackQuality("tiny")');
         }
 
         if (player.setPlaybackQualityRange) {
+            // Clear any potential previous locks first?
+            // player.setPlaybackQualityRange('auto', 'auto'); 
+            // Lock to tiny
             player.setPlaybackQualityRange('tiny', 'tiny');
-            console.log('[Audio Mode] Called setPlaybackQualityRange("tiny", "tiny")');
         }
 
         // Method 2: Try using internal YouTube methods
         if (typeof player.setInternalQuality === 'function') {
             player.setInternalQuality('tiny');
-            console.log('[Audio Mode] Called setInternalQuality("tiny")');
         }
 
         // Method 3: Directly set the quality using YouTube's internal state
         if (player.playerInfo && player.playerInfo.setPlaybackQuality) {
             player.playerInfo.setPlaybackQuality('tiny');
-            console.log('[Audio Mode] Called playerInfo.setPlaybackQuality("tiny")');
         }
 
-        // Method 4: Disable auto quality
+        // Method 4: Disable auto quality by forcing preference
         if (player.setPreferredQuality) {
             player.setPreferredQuality('tiny');
-            console.log('[Audio Mode] Called setPreferredQuality("tiny")');
         }
 
         // Wait a moment for quality to be applied
         setTimeout(() => {
             // Verify current quality
             const currentQuality = player.getPlaybackQuality ? player.getPlaybackQuality() : 'unknown';
-            console.log('[Audio Mode] Current quality after setting:', currentQuality);
 
             // Only use UI interaction if API methods completely failed AND this is the first attempt
             // Don't do UI interaction during periodic checks to avoid interrupting playback
             const isFirstAttempt = !player.__audioModeQualityAttempted;
-            if (currentQuality !== 'tiny' && currentQuality !== 'small' && isFirstAttempt) {
-                console.log('[Audio Mode] API methods failed on first attempt, will try UI interaction...');
-                player.__audioModeQualityAttempted = true;
-                clickQualitySetting(video);
+            if (currentQuality !== 'tiny' && currentQuality !== 'small') {
+                if (isFirstAttempt) {
+                    console.log('[Audio Mode] API methods failed on first attempt, will try UI interaction...');
+                    player.__audioModeQualityAttempted = true;
+                    // Use the generalized click function
+                    clickQualitySetting(video, '144p');
+                }
             } else {
                 player.__audioModeQualityAttempted = true;
             }
 
             // Restore playback state if it changed
             if (wasPlaying && video.paused) {
-                console.log('[Audio Mode] Resuming playback...');
                 video.play().catch(err => console.log('[Audio Mode] Could not resume playback:', err));
             }
         }, 500);
 
-
     } catch (error) {
         console.error('[Audio Mode] Error setting quality:', error);
+    }
+};
+
+/**
+ * Restore quality to 720p (or auto if unavailable)
+ */
+/**
+ * Restore quality to 720p (or auto if unavailable)
+ * Includes retry logic for reliability
+ * @param {number} attempts - Number of retry attempts remaining
+ */
+const restoreQuality = (attempts = 3) => {
+    const player = document.getElementById('movie_player');
+    const video = getVideoElement();
+
+    if (!player || !video) {
+        if (attempts > 0) {
+            setTimeout(() => restoreQuality(attempts - 1), 500);
+        }
+        return;
+    }
+
+    try {
+        const availableLevels = player.getAvailableQualityLevels ? player.getAvailableQualityLevels() : [];
+
+        let target = QUALITY.RESTORE;
+        let uiTargetText = '720p';
+
+        // If 720p is not available, fallback to auto
+        if (availableLevels.length > 0 && !availableLevels.includes(QUALITY.RESTORE)) {
+            target = 'auto';
+            uiTargetText = 'Auto';
+        }
+
+        // Apply quality restoration using robust methods
+        if (player.setPlaybackQualityRange) {
+            // Clear any existing range constraint first (important for breaking manual locks)
+            player.setPlaybackQualityRange('auto', 'auto');
+
+            // Then set specific if not auto
+            if (target !== 'auto') {
+                player.setPlaybackQualityRange(target, target);
+            }
+        }
+
+        if (player.setPlaybackQuality) {
+            player.setPlaybackQuality(target);
+        }
+
+        if (player.setInternalQuality) {
+            player.setInternalQuality(target);
+        }
+
+        if (player.setPreferredQuality) {
+            player.setPreferredQuality(target);
+        }
+
+        // VERIFY and FALBACK/RETRY
+        setTimeout(() => {
+            const currentQuality = player.getPlaybackQuality ? player.getPlaybackQuality() : 'unknown';
+
+            // If not successful yet...
+            if (target === QUALITY.RESTORE && currentQuality !== QUALITY.RESTORE) {
+                if (attempts > 0) {
+                    // Try UI click as part of retry if API failed
+                    clickQualitySetting(video, uiTargetText);
+
+                    // Schedule next retry
+                    setTimeout(() => restoreQuality(attempts - 1), 800);
+                } else {
+                }
+            } else {
+            }
+        }, 500);
+
+    } catch (e) {
+        console.error('[Audio Mode] Error restoring quality:', e);
+        if (attempts > 0) {
+            setTimeout(() => restoreQuality(attempts - 1), 1000);
+        }
     }
 };
 
@@ -453,10 +530,8 @@ function checkAndEnforceQuality() {
     if (!player || !audioModeEnabled) return;
 
     const currentQuality = player.getPlaybackQuality ? player.getPlaybackQuality() : null;
-    console.log('[Audio Mode] Quality check - current quality:', currentQuality);
 
     if (currentQuality && currentQuality !== QUALITY.TARGET && currentQuality !== QUALITY.FALLBACK) {
-        console.log('[Audio Mode] Quality changed to', currentQuality, '- forcing back to 144p');
         forceLowestQuality(player, getVideoElement());
     }
 }
@@ -466,218 +541,24 @@ function setLowestQuality() {
     const video = getVideoElement();
 
     if (!player || !video) {
-        console.log('[Audio Mode] Player or video not found, retrying...');
         setTimeout(setLowestQuality, 1000);
         return;
     }
 
-    console.log('[Audio Mode] Player found, attempting to set quality to 144p');
+    // Use the global function
+    forceLowestQuality(player, video);
 
-    // Function to force set quality to 144p using multiple methods
-    const forceLowestQuality = () => {
-        try {
-            // Save the current playback state
-            const wasPlaying = !video.paused;
-            const currentTime = video.currentTime;
-
-            // Method 1: Try the standard API methods
-            const availableLevels = player.getAvailableQualityLevels ? player.getAvailableQualityLevels() : [];
-            console.log('[Audio Mode] Available quality levels:', availableLevels);
-
-            if (player.setPlaybackQuality) {
-                player.setPlaybackQuality('tiny');
-                console.log('[Audio Mode] Called setPlaybackQuality("tiny")');
+    // Fallback: Also try the UI click directly if it's the very first time and video is playing
+    // (This is an extra safety layer for the "Manual" case the user reported)
+    if (!player.__audioModeQualityAttempted && !video.paused) {
+        setTimeout(() => {
+            const q = player.getPlaybackQuality ? player.getPlaybackQuality() : '';
+            if (q !== 'tiny' && q !== 'small') {
+                clickQualitySetting(video, '144p');
+                player.__audioModeQualityAttempted = true;
             }
-
-            if (player.setPlaybackQualityRange) {
-                player.setPlaybackQualityRange('tiny', 'tiny');
-                console.log('[Audio Mode] Called setPlaybackQualityRange("tiny", "tiny")');
-            }
-
-            // Method 2: Try using internal YouTube methods
-            if (typeof player.setInternalQuality === 'function') {
-                player.setInternalQuality('tiny');
-                console.log('[Audio Mode] Called setInternalQuality("tiny")');
-            }
-
-            // Method 3: Directly set the quality using YouTube's internal state
-            if (player.playerInfo && player.playerInfo.setPlaybackQuality) {
-                player.playerInfo.setPlaybackQuality('tiny');
-                console.log('[Audio Mode] Called playerInfo.setPlaybackQuality("tiny")');
-            }
-
-            // Method 4: Disable auto quality
-            if (player.setPreferredQuality) {
-                player.setPreferredQuality('tiny');
-                console.log('[Audio Mode] Called setPreferredQuality("tiny")');
-            }
-
-            // Wait a moment for quality to be applied
-            setTimeout(() => {
-                // Verify current quality
-                const currentQuality = player.getPlaybackQuality ? player.getPlaybackQuality() : 'unknown';
-                console.log('[Audio Mode] Current quality after setting:', currentQuality);
-
-                // Only use UI interaction if API methods completely failed AND this is the first attempt
-                // Don't do UI interaction during periodic checks to avoid interrupting playback
-                const isFirstAttempt = !player.__audioModeQualityAttempted;
-                if (currentQuality !== 'tiny' && currentQuality !== 'small' && isFirstAttempt) {
-                    console.log('[Audio Mode] API methods failed on first attempt, will try UI interaction...');
-                    player.__audioModeQualityAttempted = true;
-                    clickQualitySetting();
-                } else {
-                    player.__audioModeQualityAttempted = true;
-                }
-
-                // Restore playback state if it changed
-                if (wasPlaying && video.paused) {
-                    console.log('[Audio Mode] Resuming playback...');
-                    video.play().catch(err => console.log('[Audio Mode] Could not resume playback:', err));
-                }
-            }, 500);
-
-
-        } catch (error) {
-            console.error('[Audio Mode] Error setting quality:', error);
-        }
-    };
-
-    // Function to interact with YouTube's quality settings UI (invisibly)
-    const clickQualitySetting = () => {
-        try {
-            // Save playback state before UI interaction
-            const wasPlaying = !video.paused;
-            const currentTime = video.currentTime;
-
-            console.log('[Audio Mode] Starting invisible UI interaction...');
-
-            // Hide the settings panel from view
-            const settingsPanel = document.querySelector('.ytp-settings-menu');
-            const popup = document.querySelector('.ytp-popup');
-
-            // Store original styles to restore later
-            const originalPanelStyles = {};
-            const originalPopupStyles = {};
-
-            if (settingsPanel) {
-                originalPanelStyles.visibility = settingsPanel.style.visibility;
-                originalPanelStyles.opacity = settingsPanel.style.opacity;
-                originalPanelStyles.pointerEvents = settingsPanel.style.pointerEvents;
-
-                // Make completely invisible
-                settingsPanel.style.visibility = 'hidden';
-                settingsPanel.style.opacity = '0';
-                settingsPanel.style.pointerEvents = 'none';
-            }
-
-            if (popup) {
-                originalPopupStyles.visibility = popup.style.visibility;
-                originalPopupStyles.opacity = popup.style.opacity;
-                originalPopupStyles.pointerEvents = popup.style.pointerEvents;
-
-                popup.style.visibility = 'hidden';
-                popup.style.opacity = '0';
-                popup.style.pointerEvents = 'none';
-            }
-
-            // Open settings menu (now invisible)
-            const settingsButton = document.querySelector('.ytp-settings-button');
-            if (settingsButton) {
-                settingsButton.click();
-                console.log('[Audio Mode] Clicked settings button (hidden)');
-
-                // Wait for menu to open, then click quality option
-                setTimeout(() => {
-                    const qualityMenuItem = Array.from(document.querySelectorAll('.ytp-menuitem')).find(
-                        item => item.textContent.toLowerCase().includes('quality')
-                    );
-
-                    if (qualityMenuItem) {
-                        qualityMenuItem.click();
-                        console.log('[Audio Mode] Clicked quality menu item (hidden)');
-
-                        // Wait for quality menu to open, then select 144p
-                        setTimeout(() => {
-                            const quality144p = Array.from(document.querySelectorAll('.ytp-menuitem')).find(
-                                item => item.textContent.includes('144p')
-                            );
-
-                            if (quality144p) {
-                                quality144p.click();
-                                console.log('[Audio Mode] Successfully clicked 144p option (hidden)');
-                            } else {
-                                // If 144p not available, try the lowest available
-                                const allQualities = document.querySelectorAll('.ytp-menuitem');
-                                if (allQualities.length > 0) {
-                                    allQualities[allQualities.length - 1].click();
-                                    console.log('[Audio Mode] Clicked lowest available quality (hidden)');
-                                }
-                            }
-
-                            // Close and cleanup
-                            setTimeout(() => {
-                                // Simulate Escape to close
-                                const escapeEvent = new KeyboardEvent('keydown', {
-                                    key: 'Escape',
-                                    code: 'Escape',
-                                    keyCode: 27,
-                                    which: 27,
-                                    bubbles: true,
-                                    cancelable: true
-                                });
-                                document.dispatchEvent(escapeEvent);
-
-                                // Restore original styles after a brief delay
-                                setTimeout(() => {
-                                    if (settingsPanel) {
-                                        settingsPanel.style.visibility = originalPanelStyles.visibility || '';
-                                        settingsPanel.style.opacity = originalPanelStyles.opacity || '';
-                                        settingsPanel.style.pointerEvents = originalPanelStyles.pointerEvents || '';
-                                    }
-
-                                    if (popup) {
-                                        popup.style.visibility = originalPopupStyles.visibility || '';
-                                        popup.style.opacity = originalPopupStyles.opacity || '';
-                                        popup.style.pointerEvents = originalPopupStyles.pointerEvents || '';
-                                    }
-
-                                    console.log('[Audio Mode] Completed invisible quality change');
-
-                                    // Restore playback state after menu interaction
-                                    if (wasPlaying && video.paused) {
-                                        console.log('[Audio Mode] Restoring playback...');
-                                        video.currentTime = currentTime;
-                                        video.play().catch(err => console.log('[Audio Mode] Could not resume:', err));
-                                    }
-                                }, 200);
-                            }, 100);
-                        }, 300);
-                    }
-                }, 300);
-            }
-        } catch (error) {
-            console.error('[Audio Mode] Error in invisible UI interaction:', error);
-        }
-    };
-
-    // Wait for player to be ready, then set quality
-    const waitForPlayerReady = () => {
-        if (video.readyState >= 2) { // HAVE_CURRENT_DATA or better
-            console.log('[Audio Mode] Video is ready, setting quality now');
-            forceLowestQuality();
-        } else {
-            console.log('[Audio Mode] Waiting for video to be ready...');
-            video.addEventListener('loadeddata', () => {
-                forceLowestQuality();
-            }, { once: true });
-        }
-    };
-
-    // Start the process
-    waitForPlayerReady();
-
-    // Quality enforcement is now handled by consolidatedinterval in startUsageTracking()
-    // No need for separate quality check interval
+        }, 800);
+    }
 }
 
 function createAudioModeOverlay() {

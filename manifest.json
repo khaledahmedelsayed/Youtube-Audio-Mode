@@ -1,9 +1,10 @@
 {
     "manifest_version": 3,
-    "name": "YouTube Audio Mode",
+    "name": "__MSG_appName__",
     "version": "1.1.0",
     "version_name": "1.1.0",
-    "description": "Play YouTube videos in audio-only mode to save bandwidth and reduce internet usage",
+    "description": "__MSG_extDescription__",
+    "default_locale": "en",
     "homepage_url": "https://github.com/Ahmed/youtube-audio-mode",
     "permissions": [
         "storage",
@@ -33,7 +34,7 @@
                 "windows": "Alt+Shift+A",
                 "linux": "Alt+Shift+A"
             },
-            "description": "Toggle Audio Mode"
+            "description": "__MSG_toggleCommand__"
         }
     },
     "content_scripts": [
@@ -63,7 +64,9 @@
         {
             "resources": [
                 "overlay.css",
-                "fonts/Cairo-Variable.ttf"
+                "fonts/Cairo-Variable.ttf",
+                "_locales/en/messages.json",
+                "_locales/ar/messages.json"
             ],
             "matches": [
                 "https://www.youtube.com/*"

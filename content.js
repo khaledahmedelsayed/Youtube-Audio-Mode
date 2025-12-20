@@ -36,30 +36,55 @@ let currentLanguage = 'en';
 let videoPlayHandler = null;
 let videoPauseHandler = null;
 
-const translations = {
-    en: {
-        activeTitle: 'Audio Mode Active',
-        activeDesc: 'Saving your bandwidth'
-    },
-    ar: {
-        activeTitle: 'وضع الصوت مفعل',
-        activeDesc: 'نقوم بتوفير باقتك'
+// Current language and loaded messages
+let loadedMessages = {};
+
+// Helper function to get translated messages
+function t(messageName) {
+    // First try to get from loaded messages (for custom language selection)
+    if (loadedMessages[messageName] && loadedMessages[messageName].message) {
+        return loadedMessages[messageName].message;
     }
-};
+    // Fallback to chrome.i18n if not loaded yet
+    return chrome.i18n.getMessage(messageName) || messageName;
+}
+
+// Load messages for a specific language
+async function loadMessages(lang) {
+    try {
+        const url = chrome.runtime.getURL(`_locales/${lang}/messages.json`);
+        const response = await fetch(url);
+        const messages = await response.json();
+        loadedMessages = messages;
+        currentLanguage = lang;
+        return messages;
+    } catch (error) {
+        console.error(`Failed to load messages for ${lang}:`, error);
+        return null;
+    }
+}
 
 // Initialize by checking saved preference
 if (chrome.runtime?.id) {
     try {
-        chrome.storage.sync.get(['audioMode', 'language'], function (result) {
+        chrome.storage.sync.get(['audioMode', 'language'], async function (result) {
             if (chrome.runtime.lastError) {
                 console.log('[Audio Mode] Could not load initial state:', chrome.runtime.lastError);
                 return;
             }
+
+            // Load language messages
+            if (result.language) {
+                await loadMessages(result.language);
+            } else {
+                // Detect from browser
+                const detectedLang = chrome.i18n.getUILanguage().startsWith('ar') ? 'ar' : 'en';
+                await loadMessages(detectedLang);
+            }
+
+            // Enable audio mode if it was previously enabled
             if (result.audioMode) {
                 enableAudioMode();
-            }
-            if (result.language) {
-                currentLanguage = result.language;
             }
         });
     } catch (error) {
@@ -89,6 +114,7 @@ function clearVideoCache() {
 
 // Listen for messages from popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+
     if (request.action === 'toggleAudioMode') {
         if (audioModeEnabled) {
             disableAudioMode();
@@ -102,12 +128,17 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         updateOverlayTheme(request.backgroundType, request.backgroundValue);
     } else if (request.action === 'updateLanguage') {
         currentLanguage = request.language;
-        updateOverlayLanguage();
+        updateOverlayLanguage().then(() => {
+            sendResponse({ success: true });
+        }).catch(err => {
+            sendResponse({ success: false, error: err.message });
+        });
+        return true; // Keep message channel open for async response
     }
     return true;
 });
 
-function enableAudioMode() {
+async function enableAudioMode() {
     audioModeEnabled = true;
 
     // Find the video player
@@ -123,7 +154,7 @@ function enableAudioMode() {
     video.style.minHeight = '1px';
 
     // Create visual overlay first for immediate feedback
-    createAudioModeOverlay();
+    await createAudioModeOverlay();
 
     // Wait for video to start playing before setting quality
     // This makes the transition much smoother
@@ -586,7 +617,10 @@ function setLowestQuality() {
     }
 }
 
-function createAudioModeOverlay() {
+async function createAudioModeOverlay() {
+    // Ensure messages are loaded for current language
+    await loadMessages(currentLanguage);
+
     // Remove existing overlay if any
     if (audioModeOverlay) {
         audioModeOverlay.remove();
@@ -603,8 +637,8 @@ function createAudioModeOverlay() {
     audioModeOverlay.id = 'youtube-audio-mode-overlay';
     audioModeOverlay.innerHTML = `
     <div class="audio-mode-content">
-      <h2 id="am-overlay-title">${translations[currentLanguage].activeTitle}</h2>
-      <p id="am-overlay-desc">${translations[currentLanguage].activeDesc}</p>
+      <h2 id="am-overlay-title">${t('activeTitle')}</h2>
+      <p id="am-overlay-desc">${t('activeDesc')}</p>
       <div class="audio-visualizer">
         <span class="bar"></span>
         <span class="bar"></span>
@@ -614,6 +648,7 @@ function createAudioModeOverlay() {
       </div>
     </div >
         `;
+
 
     // CSS is now loaded from overlay.css via manifest.json
     // No need to inject styles dynamically
@@ -685,20 +720,25 @@ function updateOverlayTheme(type, value) {
     }
 }
 
-function updateOverlayLanguage() {
-    if (!audioModeOverlay) return;
 
-    const t = translations[currentLanguage];
-    const title = audioModeOverlay.querySelector('#am-overlay-title');
-    const desc = audioModeOverlay.querySelector('#am-overlay-desc');
+async function updateOverlayLanguage() {
+    // Load messages for the new language
+    await loadMessages(currentLanguage);
 
-    if (title) title.textContent = t.activeTitle;
-    if (desc) desc.textContent = t.activeDesc;
+    // If overlay exists, update its text content only (don't recreate)
+    if (audioModeOverlay) {
+        const title = audioModeOverlay.querySelector('#am-overlay-title');
+        const desc = audioModeOverlay.querySelector('#am-overlay-desc');
 
-    if (currentLanguage === 'ar') {
-        audioModeOverlay.setAttribute('dir', 'rtl');
-    } else {
-        audioModeOverlay.removeAttribute('dir');
+        if (title) title.textContent = t('activeTitle');
+        if (desc) desc.textContent = t('activeDesc');
+
+        // Update RTL direction
+        if (currentLanguage === 'ar') {
+            audioModeOverlay.setAttribute('dir', 'rtl');
+        } else {
+            audioModeOverlay.removeAttribute('dir');
+        }
     }
 }
 

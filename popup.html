@@ -12,22 +12,28 @@
     <div class="container">
         <div class="header">
             <div class="header-info">
-                <h1>YouTube Audio Mode</h1>
-                <p class="subtitle">Save bandwidth, keep the music</p>
+                <h1 data-i18n="appName">YouTube Audio Mode</h1>
+                <p class="subtitle" data-i18n="appDesc">Save bandwidth, keep the music</p>
             </div>
-            <button id="settings-btn" class="icon-btn" title="Settings">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path
-                        d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.47a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.39a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z">
-                    </path>
-                    <circle cx="12" cy="12" r="3"></circle>
-                </svg>
-            </button>
+            <div style="display: flex; gap: 8px;">
+                <button id="lang-btn" class="icon-btn" title="Language/لغة"
+                    style="font-family: 'Cairo', sans-serif; font-weight: 700;">
+                    ع
+                </button>
+                <button id="settings-btn" class="icon-btn" title="Settings">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path
+                            d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.47a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.39a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z">
+                        </path>
+                        <circle cx="12" cy="12" r="3"></circle>
+                    </svg>
+                </button>
+            </div>
         </div>
 
         <div id="settings-panel" class="settings-panel">
             <div class="settings-header">
-                <h2>Appearance</h2>
+                <h2 data-i18n="appearance">Appearance</h2>
                 <button id="close-settings" class="icon-btn">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M18 6L6 18M6 6l12 12"></path>
@@ -37,15 +43,15 @@
 
             <div class="settings-content">
                 <div class="setting-group">
-                    <label>Background Type</label>
+                    <label data-i18n="backgroundType">Background Type</label>
                     <div class="toggle-group">
-                        <button class="toggle-btn active" data-type="color">Color</button>
-                        <button class="toggle-btn" data-type="image">Image</button>
+                        <button class="toggle-btn active" data-type="color" data-i18n="color">Color</button>
+                        <button class="toggle-btn" data-type="image" data-i18n="image">Image</button>
                     </div>
                 </div>
 
                 <div id="color-options" class="setting-group">
-                    <label>Presets</label>
+                    <label data-i18n="presets">Presets</label>
                     <div class="theme-grid">
                         <button class="theme-btn" data-theme="default"
                             style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);"
@@ -66,7 +72,7 @@
                             title="Minimal Dark"></button>
                     </div>
 
-                    <label style="margin-top: 12px; display: block;">Custom Color</label>
+                    <label style="margin-top: 12px; display: block;" data-i18n="customColor">Custom Color</label>
                     <div class="color-picker-wrapper">
                         <input type="color" id="custom-color-picker" value="#667eea">
                         <span id="color-value-text">#667eea</span>
@@ -74,12 +80,12 @@
                 </div>
 
                 <div id="image-options" class="setting-group hidden">
-                    <label>Image URL</label>
+                    <label data-i18n="imageUrl">Image URL</label>
                     <div class="input-group">
                         <input type="text" id="custom-image-url" placeholder="https://example.com/image.jpg">
-                        <button id="apply-image-btn">Apply</button>
+                        <button id="apply-image-btn" data-i18n="apply">Apply</button>
                     </div>
-                    <p class="hint">Paste a direct link to an image.</p>
+                    <p class="hint" data-i18n="imageHint">Paste a direct link to an image.</p>
                 </div>
             </div>
         </div>
@@ -87,8 +93,8 @@
         <div class="content">
             <div class="toggle-section">
                 <div class="toggle-info">
-                    <h2>Audio Only</h2>
-                    <p id="status-text">Click to enable</p>
+                    <h2 data-i18n="audioOnly">Audio Only</h2>
+                    <p id="status-text" data-i18n="statusOff">Click to enable</p>
                 </div>
                 <label class="toggle-switch">
                     <input type="checkbox" id="audioToggle">
@@ -97,7 +103,7 @@
             </div>
 
             <div class="shortcuts-hint">
-                <span>Shortcut:</span>
+                <span data-i18n="shortcut">Shortcut(click to change):</span>
                 <div class="keys" id="shortcut-display">
                     <!-- Configured via JS -->
                     <span class="loading">Loading...</span>
@@ -106,8 +112,8 @@
 
             <div class="stats-header-row">
                 <div class="stats-toggle">
-                    <button class="stats-filter active" data-filter="month">This Month</button>
-                    <button class="stats-filter" data-filter="all">All Time</button>
+                    <button class="stats-filter active" data-filter="month" data-i18n="thisMonth">This Month</button>
+                    <button class="stats-filter" data-filter="all" data-i18n="allTime">All Time</button>
                 </div>
             </div>
 
@@ -116,39 +122,39 @@
                     <div class="stat-icon">📊</div>
                     <div class="stat-content">
                         <div class="stat-value" id="data-saved-value">0 MB</div>
-                        <div class="stat-label">Saved vs 720p</div>
+                        <div class="stat-label" data-i18n="savedData">Saved vs 720p</div>
                     </div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-icon">🎧</div>
                     <div class="stat-content">
                         <div class="stat-value" id="listened-time-value">0m</div>
-                        <div class="stat-label">Listened</div>
+                        <div class="stat-label" data-i18n="listenedTime">Listened</div>
                     </div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-icon">⏱️</div>
                     <div class="stat-content">
                         <div class="stat-value" id="active-time-value">0m</div>
-                        <div class="stat-label">Active</div>
+                        <div class="stat-label" data-i18n="activeTime">Active</div>
                     </div>
                 </div>
             </div>
 
             <div class="table-section">
-                <h3>Est. Data Usage</h3>
+                <h3 data-i18n="estDataUsage">Est. Data Usage</h3>
                 <table class="comparison-table">
                     <thead>
                         <tr>
-                            <th>Quality</th>
-                            <th>Usage</th>
-                            <th>Saved</th>
+                            <th data-i18n="quality">Quality</th>
+                            <th data-i18n="usage">Usage</th>
+                            <th data-i18n="saved">Saved</th>
                         </tr>
                     </thead>
                     <tbody>
                         <tr class="row-144p active-mode">
                             <td>
-                                <span class="quality-tag">Audio Mode</span>
+                                <span class="quality-tag" data-i18n="audioMode">Audio Mode</span>
                             </td>
                             <td id="usage-144p">0 MB</td>
                             <td>-</td>
@@ -175,7 +181,7 @@
                         d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z">
                     </path>
                 </svg>
-                Developed by Ahmed Adli
+                <span data-i18n="developedBy">Developed by Ahmed Adli</span>
             </a>
         </div>
     </div>

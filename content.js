@@ -32,17 +32,34 @@ let audioModeOverlay = null;
 let qualityCheckInterval = null;
 let usageTrackingInterval = null;
 let cachedVideoElement = null;
+let currentLanguage = 'en';
+let videoPlayHandler = null;
+let videoPauseHandler = null;
+
+const translations = {
+    en: {
+        activeTitle: 'Audio Mode Active',
+        activeDesc: 'Saving your bandwidth'
+    },
+    ar: {
+        activeTitle: 'وضع الصوت مفعل',
+        activeDesc: 'نقوم بتوفير باقتك'
+    }
+};
 
 // Initialize by checking saved preference
 if (chrome.runtime?.id) {
     try {
-        chrome.storage.sync.get(['audioMode'], function (result) {
+        chrome.storage.sync.get(['audioMode', 'language'], function (result) {
             if (chrome.runtime.lastError) {
                 console.log('[Audio Mode] Could not load initial state:', chrome.runtime.lastError);
                 return;
             }
             if (result.audioMode) {
                 enableAudioMode();
+            }
+            if (result.language) {
+                currentLanguage = result.language;
             }
         });
     } catch (error) {
@@ -83,6 +100,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         sendResponse({ enabled: audioModeEnabled });
     } else if (request.action === 'updateTheme') {
         updateOverlayTheme(request.backgroundType, request.backgroundValue);
+    } else if (request.action === 'updateLanguage') {
+        currentLanguage = request.language;
+        updateOverlayLanguage();
     }
     return true;
 });
@@ -135,6 +155,7 @@ function enableAudioMode() {
         try {
             chrome.storage.sync.set({ audioMode: true });
         } catch (error) {
+            console.log('[Audio Mode] Could not save state:', error);
         }
     }
 
@@ -160,6 +181,18 @@ function disableAudioMode() {
     const player = document.getElementById('movie_player');
     if (player) {
         delete player.__audioModeQualityAttempted;
+    }
+
+    // Clean up video event listeners (reuse video from above)
+    if (video) {
+        if (videoPlayHandler) {
+            video.removeEventListener('play', videoPlayHandler);
+            videoPlayHandler = null;
+        }
+        if (videoPauseHandler) {
+            video.removeEventListener('pause', videoPauseHandler);
+            videoPauseHandler = null;
+        }
     }
 
     // Remove overlay
@@ -307,11 +340,6 @@ const clickQualitySetting = (video, targetText = '144p') => {
  * @param {HTMLElement} player - The YouTube player element
  * @param {HTMLVideoElement} video - The video element
  */
-/**
- * Function to force set quality to 144p using multiple methods
- * @param {HTMLElement} player - The YouTube player element
- * @param {HTMLVideoElement} video - The video element
- */
 const forceLowestQuality = (player, video) => {
     try {
         // Save the current playback state
@@ -379,9 +407,6 @@ const forceLowestQuality = (player, video) => {
 
 /**
  * Restore quality to 720p (or auto if unavailable)
- */
-/**
- * Restore quality to 720p (or auto if unavailable)
  * Includes retry logic for reliability
  * @param {number} attempts - Number of retry attempts remaining
  */
@@ -391,7 +416,7 @@ const restoreQuality = (attempts = 3) => {
 
     if (!player || !video) {
         if (attempts > 0) {
-            setTimeout(() => restoreQuality(attempts - 1), 500);
+            setTimeout(() => restoreQuality(attempts - 1), 100);
         }
         return;
     }
@@ -578,8 +603,8 @@ function createAudioModeOverlay() {
     audioModeOverlay.id = 'youtube-audio-mode-overlay';
     audioModeOverlay.innerHTML = `
     <div class="audio-mode-content">
-      <h2>Audio Mode Active</h2>
-      <p>Saving your bandwidth</p>
+      <h2 id="am-overlay-title">${translations[currentLanguage].activeTitle}</h2>
+      <p id="am-overlay-desc">${translations[currentLanguage].activeDesc}</p>
       <div class="audio-visualizer">
         <span class="bar"></span>
         <span class="bar"></span>
@@ -587,8 +612,8 @@ function createAudioModeOverlay() {
         <span class="bar"></span>
         <span class="bar"></span>
       </div>
-    </div>
-  `;
+    </div >
+        `;
 
     // CSS is now loaded from overlay.css via manifest.json
     // No need to inject styles dynamically
@@ -599,6 +624,11 @@ function createAudioModeOverlay() {
     videoContainer.style.height = '100%';
 
     videoContainer.appendChild(audioModeOverlay);
+
+    // Apply RTL if needed
+    if (currentLanguage === 'ar') {
+        audioModeOverlay.setAttribute('dir', 'rtl');
+    }
 
     // Apply saved theme
     // Safety check: Stop if extension context is invalidated
@@ -626,15 +656,17 @@ function createAudioModeOverlay() {
             visualizer.classList.add('paused');
         }
 
-        // Listen for play event
-        video.addEventListener('play', () => {
+        // Create named handlers for cleanup
+        videoPlayHandler = () => {
             visualizer.classList.remove('paused');
-        });
-
-        // Listen for pause event
-        video.addEventListener('pause', () => {
+        };
+        videoPauseHandler = () => {
             visualizer.classList.add('paused');
-        });
+        };
+
+        // Listen for play/pause events
+        video.addEventListener('play', videoPlayHandler);
+        video.addEventListener('pause', videoPauseHandler);
     }
 }
 
@@ -645,11 +677,28 @@ function updateOverlayTheme(type, value) {
     if (!value) value = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
 
     if (type === 'image') {
-        audioModeOverlay.style.background = `url("${value}") no-repeat center center/cover`;
+        audioModeOverlay.style.background = `url("${value}") no-repeat center center / cover`;
         audioModeOverlay.classList.add('has-image');
     } else {
         audioModeOverlay.style.background = value;
         audioModeOverlay.classList.remove('has-image');
+    }
+}
+
+function updateOverlayLanguage() {
+    if (!audioModeOverlay) return;
+
+    const t = translations[currentLanguage];
+    const title = audioModeOverlay.querySelector('#am-overlay-title');
+    const desc = audioModeOverlay.querySelector('#am-overlay-desc');
+
+    if (title) title.textContent = t.activeTitle;
+    if (desc) desc.textContent = t.activeDesc;
+
+    if (currentLanguage === 'ar') {
+        audioModeOverlay.setAttribute('dir', 'rtl');
+    } else {
+        audioModeOverlay.removeAttribute('dir');
     }
 }
 

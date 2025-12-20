@@ -1,3 +1,11 @@
+/* Local Cairo font - bundled with extension for performance */
+@font-face {
+  font-family: "Cairo";
+  src: url("fonts/Cairo-Variable.ttf") format("truetype");
+  font-weight: 200 900;
+  font-style: normal;
+}
+
 :root {
   /* Color System */
   --primary-color: #667eea;
@@ -46,8 +54,8 @@
 }
 
 body {
-  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-    sans-serif;
+  font-family: "Cairo", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, sans-serif;
   background: linear-gradient(
     135deg,
     var(--bg-dark) 0%,
@@ -58,6 +66,40 @@ body {
   max-width: 420px;
   width: 380px;
   min-height: 520px;
+}
+
+/* RTL Support */
+[dir="rtl"] .header {
+  text-align: right;
+}
+
+[dir="rtl"] .toggle-section {
+  flex-direction: row-reverse;
+}
+
+[dir="rtl"] .toggle-info {
+  text-align: right;
+}
+
+[dir="rtl"] .header {
+  flex-direction: row-reverse;
+}
+
+[dir="rtl"] #settings-btn {
+  left: 0;
+  right: auto;
+}
+
+[dir="rtl"] .input-group {
+  flex-direction: row-reverse;
+}
+
+[dir="rtl"] .settings-header {
+  flex-direction: row-reverse;
+}
+
+[dir="rtl"] .stat-card {
+  direction: rtl;
 }
 
 .container {
@@ -566,6 +608,7 @@ kbd {
 
 input[type="color"] {
   -webkit-appearance: none;
+  appearance: none;
   border: none;
   width: 32px;
   height: 32px;

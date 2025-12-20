@@ -1,4 +1,11 @@
 /* YouTube Audio Mode - Overlay Styles */
+@font-face {
+  font-family: "Cairo";
+  src: url("chrome-extension://__MSG_@@extension_id__/fonts/Cairo-Variable.ttf")
+    format("truetype");
+  font-weight: 200 900;
+  font-style: normal;
+}
 
 #youtube-audio-mode-overlay {
   position: absolute !important;
@@ -17,6 +24,11 @@
   margin: 0 !important;
   padding: 0 !important;
   transition: background 0.5s ease;
+  font-family: "Cairo", sans-serif !important;
+}
+
+#youtube-audio-mode-overlay[dir="rtl"] {
+  direction: rtl;
 }
 
 #youtube-audio-mode-overlay.has-image::before {

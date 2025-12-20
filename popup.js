@@ -3,6 +3,139 @@
 const audioToggle = document.getElementById('audioToggle');
 const statusText = document.getElementById('status-text');
 const toggleSection = document.querySelector('.toggle-section');
+const langBtn = document.getElementById('lang-btn');
+
+// Translation Dictionary
+const translations = {
+    en: {
+        appName: 'YouTube Audio Mode',
+        appDesc: 'Save bandwidth, keep the music',
+        appearance: 'Appearance',
+        backgroundType: 'Background Type',
+        color: 'Color',
+        image: 'Image',
+        presets: 'Presets',
+        customColor: 'Custom Color',
+        imageUrl: 'Image URL',
+        apply: 'Apply',
+        imageHint: 'Paste a direct link to an image.',
+        audioOnly: 'Audio Only',
+        statusOff: 'Click to enable',
+        statusOn: 'Audio mode is ON',
+        shortcut: 'Shortcut(click to change):',
+        thisMonth: 'This Month',
+        allTime: 'All Time',
+        savedData: 'Saved vs 720p',
+        listenedTime: 'Listened',
+        activeTime: 'Active',
+        estDataUsage: 'Est. Data Usage',
+        quality: 'Quality',
+        usage: 'Usage',
+        saved: 'Saved',
+        audioMode: 'Audio Mode',
+        developedBy: 'Developed by Ahmed Adli',
+        onlyYoutube: 'Only works on YouTube videos',
+        applied: 'Applied!',
+        timeH: 'h',
+        timeM: 'm',
+        timeS: 's',
+        unitGB: ' GB',
+        unitMB: ' MB'
+    },
+    ar: {
+        appName: 'وضع الصوت في يوتيوب',
+        appDesc: 'وفر الانترنت، استمتع بالصوت',
+        appearance: 'المظهر',
+        backgroundType: 'نوع الخلفية',
+        color: 'لون',
+        image: 'صورة',
+        presets: 'أنماط جاهزة',
+        customColor: 'لون مخصص',
+        imageUrl: 'رابط الصورة',
+        apply: 'تطبيق',
+        imageHint: 'ضع رابط مباشر للصورة',
+        audioOnly: 'وضع الصوت',
+        statusOff: 'اضغط للتفعيل',
+        statusOn: 'وضع الصوت مفعل',
+        shortcut: 'الاختصار (اضغط للتغيير):',
+        thisMonth: 'هذا الشهر',
+        allTime: 'كل الوقت',
+        savedData: 'توفير (مقارنة بـ 720p)',
+        listenedTime: 'وقت الاستماع',
+        activeTime: 'وقت النشاط',
+        estDataUsage: 'استهلاك البيانات التقديري',
+        quality: 'الجودة',
+        usage: 'الاستهلاك',
+        saved: 'توفير',
+        audioMode: 'وضع الصوت',
+        developedBy: 'تطوير أحمد عدلي',
+        onlyYoutube: 'يعمل فقط على فيديوهات يوتيوب',
+        applied: 'تم التطبيق!',
+        timeH: 'س',
+        timeM: 'د',
+        timeS: 'ث',
+        unitGB: ' جيجا',
+        unitMB: ' ميجا'
+    }
+};
+
+let currentLang = 'en';
+
+function setLanguage(lang) {
+    currentLang = lang;
+    const t = translations[lang];
+
+    // Update direction
+    document.body.dir = lang === 'ar' ? 'rtl' : 'ltr';
+
+    // Update button text
+    langBtn.textContent = lang === 'ar' ? 'En' : 'ع';
+    langBtn.title = lang === 'ar' ? 'English' : 'Arabic';
+
+    // Update all elements with data-i18n
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        if (t[key]) {
+            el.textContent = t[key];
+        }
+    });
+
+    // Update placeholders
+    const urlInput = document.getElementById('custom-image-url');
+    if (urlInput) {
+        urlInput.placeholder = lang === 'ar' ? 'https://example.com/image.jpg' : 'https://example.com/image.jpg';
+    }
+
+    // Update dynamic status text if needed
+    updateUI(audioToggle.checked);
+    updateStats(); // Refresh stats to apply new units
+
+    // Save preference
+    chrome.storage.sync.set({ language: lang });
+
+    // Broadcast to active tab (for overlay)
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (tabs[0] && tabs[0].url.includes('youtube.com')) {
+            chrome.tabs.sendMessage(tabs[0].id, {
+                action: 'updateLanguage',
+                language: lang
+            }).catch(() => {
+                // Ignore errors if content script is not ready
+            });
+        }
+    });
+}
+
+// Initialize Language
+chrome.storage.sync.get(['language'], (result) => {
+    setLanguage(result.language || 'en');
+});
+
+// Language Toggle Handler
+langBtn.addEventListener('click', () => {
+    const newLang = currentLang === 'en' ? 'ar' : 'en';
+    setLanguage(newLang);
+});
 
 // Initialize popup state
 chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
@@ -10,7 +143,7 @@ chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
 
     // Check if we're on YouTube watch page
     if (!currentTab || !currentTab.url || !currentTab.url.match(/youtube\.com\/watch/)) {
-        statusText.textContent = 'Only works on YouTube videos';
+        statusText.textContent = translations[currentLang].onlyYoutube;
         audioToggle.disabled = true;
         toggleSection.style.opacity = '0.5';
         return;
@@ -72,11 +205,11 @@ function updateUI(enabled) {
     audioToggle.checked = enabled;
 
     if (enabled) {
-        statusText.textContent = 'Audio mode is ON';
+        statusText.textContent = translations[currentLang].statusOn;
         statusText.classList.add('active');
         toggleSection.classList.add('active');
     } else {
-        statusText.textContent = 'Audio mode is OFF';
+        statusText.textContent = translations[currentLang].statusOff;
         statusText.classList.remove('active');
         toggleSection.classList.remove('active');
     }
@@ -183,9 +316,11 @@ function formatTime(seconds) {
     const m = Math.floor((seconds / 60) % 60);
     const h = Math.floor(seconds / 3600);
 
-    if (h > 0) return `${h}h ${m}m`;
-    if (m > 0) return `${m}m ${s}s`;
-    return `${s}s`;
+    const t = translations[currentLang];
+
+    if (h > 0) return `${h}${t.timeH} ${m}${t.timeM}`;
+    if (m > 0) return `${m}${t.timeM} ${s}${t.timeS}`;
+    return `${s}${t.timeS}`;
 }
 
 function updateTableVal(id, mbValue, isSavings = false) {
@@ -198,10 +333,11 @@ function updateTableVal(id, mbValue, isSavings = false) {
 }
 
 function formatData(mb) {
+    const t = translations[currentLang];
     if (mb >= 1024) {
-        return `${(mb / 1024).toFixed(2)} GB`;
+        return `${(mb / 1024).toFixed(2)}${t.unitGB}`;
     }
-    return `${Math.round(mb)} MB`;
+    return `${Math.round(mb)}${t.unitMB}`;
 }
 
 // Update stats immediately
@@ -377,7 +513,7 @@ applyImageBtn.addEventListener('click', () => {
         saveAndApplyTheme('image', url);
         // Visual feedback
         const originalText = applyImageBtn.textContent;
-        applyImageBtn.textContent = 'Applied!';
+        applyImageBtn.textContent = translations[currentLang].applied;
         setTimeout(() => {
             applyImageBtn.textContent = originalText;
         }, 1500);
@@ -410,6 +546,8 @@ function saveAndApplyTheme(type, value) {
                 action: 'updateTheme',
                 backgroundType: type,
                 backgroundValue: value
+            }).catch(() => {
+                // Ignore errors if content script is not ready
             });
         }
     });

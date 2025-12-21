@@ -1,6 +1,8 @@
 <!-- ![YouTube Audio Mode](promo_images/marquee_promo.png) -->
 
-# YouTube Audio Mode
+# YouTube Audio Mode (Enhanced Fork)
+
+> **This is a fork of [YouTube Audio Mode](https://github.com/devahmedadli/youtube-audio-mode) by [Ahmed Adli](https://github.com/devahmedadli).**
 
 **Save bandwidth and enjoy distraction-free listening on YouTube.**
 
@@ -14,6 +16,32 @@ YouTube Audio Mode is a lightweight Chrome extension that transforms your YouTub
 - **🎵 Audio Visualizer:** A stunning, animated visualizer replaces the blank video screen.
 - **🎨 Custom Themes:** Choose from 6 beautiful gradient presets or customize the background with your own colors or images.
 - **🔒 Privacy Focused:** All data and preferences are stored locally on your device. No external tracking.
+
+---
+
+## 🆕 New Features in This Fork
+
+### Filter Mode (Whitelist-based)
+- **Mode Selection:** Choose between "Always On" (original behavior) or "Filtered" mode
+- **Channel Whitelist:** Audio mode activates only for specific channels you add
+- **Keyword Filtering:** Match video titles against keywords (e.g., "podcast", "music")
+- **Quick-Add Button:** Instantly add the current channel to your whitelist from the popup
+- **Badge Indicator:** Shows "ON" for always mode or "FLT" for filtered mode
+
+### Quality Preference Management
+- **Preferred Quality Selector:** Choose your default video quality (720p, 1080p, 4K, etc.)
+- **Smart Quality Restore:** When audio mode is disabled, video restores to your preferred quality
+- **Persistent Settings:** Quality preference saved across sessions
+
+### Internationalization (i18n)
+- **Multi-language Support:** Full English and Arabic translations
+- **RTL Support:** Proper right-to-left layout for Arabic
+
+### Bug Fixes & Improvements
+- Fixed audio mode not triggering on YouTube SPA navigation
+- Fixed settings icon becoming unclickable after navigating between videos
+- Improved keyword filtering reliability during navigation
+- Better quality restoration when toggling audio mode off
 
 ## 🚀 Installation
 
@@ -83,4 +111,6 @@ This project is licensed under the MIT License.
 
 ---
 
-_Developed with ❤️ by [Ahmed Adli](https://github.com/devahmedadli)_
+_Original extension by [Ahmed Adli](https://github.com/devahmedadli)_
+
+_Fork enhancements by [Khaled Ahmed Elsayed](https://github.com/khaledahmedelsayed)_

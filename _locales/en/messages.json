@@ -63,6 +63,26 @@
     "message": "Audio mode is ON",
     "description": "Status text when audio mode is on"
   },
+  "modeAlwaysOn": {
+    "message": "Always On",
+    "description": "Mode selector: always enable audio mode"
+  },
+  "modeFiltered": {
+    "message": "Filtered",
+    "description": "Mode selector: enable based on filter rules"
+  },
+  "configureFilters": {
+    "message": "Configure Filters",
+    "description": "Button to open filter configuration"
+  },
+  "modeAlwaysOnDesc": {
+    "message": "Audio mode on all videos",
+    "description": "Description for always on mode"
+  },
+  "modeFilteredDesc": {
+    "message": "Based on your filter rules",
+    "description": "Description for filtered mode"
+  },
   "shortcut": {
     "message": "Shortcut(click to change):",
     "description": "Label for keyboard shortcut display"
@@ -146,5 +166,105 @@
   "activeDesc": {
     "message": "Saving your bandwidth",
     "description": "Overlay description when audio mode is active"
+  },
+  "filterRules": {
+    "message": "Filter Rules",
+    "description": "Filter panel header"
+  },
+  "autoRules": {
+    "message": "Enable auto-rules",
+    "description": "Toggle label for automatic rule application"
+  },
+  "alwaysEnable": {
+    "message": "Always Enable",
+    "description": "Button to always enable audio mode for this channel"
+  },
+  "alwaysDisable": {
+    "message": "Always Disable",
+    "description": "Button to always disable audio mode for this channel"
+  },
+  "addKeyword": {
+    "message": "Add Keyword",
+    "description": "Label for keyword input section"
+  },
+  "currentChannel": {
+    "message": "Current Channel",
+    "description": "Label for current channel section"
+  },
+  "notOnVideo": {
+    "message": "Not on a video",
+    "description": "Message when not on a YouTube video page"
+  },
+  "channelNotFound": {
+    "message": "Channel not found",
+    "description": "Message when channel info cannot be extracted"
+  },
+  "whitelist": {
+    "message": "Whitelist",
+    "description": "Whitelist label"
+  },
+  "blacklist": {
+    "message": "Blacklist",
+    "description": "Blacklist label"
+  },
+  "keyword": {
+    "message": "Keyword",
+    "description": "Keyword rule type"
+  },
+  "channelId": {
+    "message": "Channel ID",
+    "description": "Channel rule type"
+  },
+  "channels": {
+    "message": "Channels",
+    "description": "Channels list header"
+  },
+  "keywords": {
+    "message": "Keywords",
+    "description": "Keywords list header"
+  },
+  "noChannels": {
+    "message": "No channels added",
+    "description": "Empty state for channels list"
+  },
+  "noKeywords": {
+    "message": "No keywords added",
+    "description": "Empty state for keywords list"
+  },
+  "add": {
+    "message": "Add",
+    "description": "Add button text"
+  },
+  "remove": {
+    "message": "Remove",
+    "description": "Remove button text"
+  },
+  "enterKeyword": {
+    "message": "Enter keyword",
+    "description": "Placeholder for keyword input"
+  },
+  "enterChannelId": {
+    "message": "Enter channel ID (UC...)",
+    "description": "Placeholder for channel ID input"
+  },
+  "ruleAdded": {
+    "message": "Rule added",
+    "description": "Toast message when rule is added"
+  },
+  "ruleRemoved": {
+    "message": "Rule removed",
+    "description": "Toast message when rule is removed"
+  },
+  "filterHint": {
+    "message": "Videos matching channels or keywords below will play in audio mode. All other videos play normally.",
+    "description": "Hint explaining how the filter works"
+  },
+  "preferredQuality": {
+    "message": "Preferred Quality",
+    "description": "Label for quality selector in settings"
+  },
+  "qualityHint": {
+    "message": "Quality to use when audio mode is off",
+    "description": "Hint text for quality selector"
   }
 }

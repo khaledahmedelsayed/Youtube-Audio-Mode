@@ -35,6 +35,9 @@ let cachedVideoElement = null;
 let currentLanguage = 'en';
 let videoPlayHandler = null;
 let videoPauseHandler = null;
+let lastAppliedVideoId = null;
+let currentModeType = 'always'; // 'always' or 'filtered'
+let savedQualityBeforeAudioMode = null; // Store user's quality to restore later
 
 // Current language and loaded messages
 let loadedMessages = {};
@@ -67,7 +70,7 @@ async function loadMessages(lang) {
 // Initialize by checking saved preference
 if (chrome.runtime?.id) {
     try {
-        chrome.storage.sync.get(['audioMode', 'language'], async function (result) {
+        chrome.storage.sync.get(['audioModeType', 'language', 'preferredQuality'], async function (result) {
             if (chrome.runtime.lastError) {
                 console.log('[Audio Mode] Could not load initial state:', chrome.runtime.lastError);
                 return;
@@ -82,14 +85,197 @@ if (chrome.runtime?.id) {
                 await loadMessages(detectedLang);
             }
 
-            // Enable audio mode if it was previously enabled
-            if (result.audioMode) {
-                enableAudioMode();
+            // Load user's preferred quality (for restore after audio mode)
+            if (result.preferredQuality) {
+                savedQualityBeforeAudioMode = result.preferredQuality;
+                console.log('[Audio Mode] Loaded preferred quality:', savedQualityBeforeAudioMode);
             }
+
+            // Set the current mode type
+            currentModeType = result.audioModeType || 'always';
+
+            // Apply mode logic
+            await applyModeLogic();
         });
     } catch (error) {
         console.log('[Audio Mode] Error during initialization:', error);
     }
+}
+
+// ===== MODE LOGIC =====
+
+/**
+ * Apply the current mode logic
+ * - 'always': Enable audio mode on all YouTube videos
+ * - 'filtered': Enable/disable based on filter rules, OFF if no match
+ */
+async function applyModeLogic() {
+    if (currentModeType === 'always') {
+        // Always On mode: enable audio mode on all videos
+        if (!audioModeEnabled) {
+            enableAudioMode(true); // fromAutoRule = true, don't persist
+        } else {
+            // Already enabled but navigated to new video - re-apply quality
+            setLowestQuality();
+        }
+    } else {
+        // Filtered mode: check filter rules
+        await applyFilteredMode();
+    }
+}
+
+/**
+ * Apply user's preferred quality to the current video
+ * Used when audio mode is OFF (normal video playback)
+ */
+function applyPreferredQuality() {
+    const player = document.getElementById('movie_player');
+    const video = getVideoElement();
+
+    if (!player || !video) {
+        // Retry if player not ready
+        setTimeout(applyPreferredQuality, 500);
+        return;
+    }
+
+    chrome.storage.sync.get(['preferredQuality'], (result) => {
+        const quality = result.preferredQuality;
+        if (!quality || quality === 'auto') {
+            // Auto or not set - let YouTube handle it
+            return;
+        }
+
+        console.log('[Audio Mode] Applying preferred quality:', quality);
+
+        try {
+            // Wait for video to be ready before setting quality
+            const setQuality = () => {
+                if (player.setPlaybackQualityRange) {
+                    player.setPlaybackQualityRange(quality, quality);
+                }
+                if (player.setPlaybackQuality) {
+                    player.setPlaybackQuality(quality);
+                }
+            };
+
+            // If video is ready, set immediately. Otherwise wait.
+            if (video.readyState >= 2) {
+                setQuality();
+            } else {
+                video.addEventListener('loadeddata', setQuality, { once: true });
+            }
+        } catch (e) {
+            console.log('[Audio Mode] Could not apply preferred quality:', e);
+        }
+    });
+}
+
+/**
+ * Apply filtered mode logic (whitelist-only)
+ * If channel/keyword matches whitelist → enable audio mode
+ * Otherwise → normal video (no audio mode)
+ */
+async function applyFilteredMode(retryCount = 0) {
+    if (!chrome.runtime?.id) return;
+
+    const MAX_RETRIES = 5;
+    const RETRY_DELAY = 600;
+
+    try {
+        const result = await new Promise(resolve => {
+            chrome.storage.sync.get(['filterRules'], resolve);
+        });
+
+        // Wait for DOM to settle after SPA navigation
+        // First attempt needs longer delay for YouTube to update DOM
+        const initialDelay = retryCount === 0 ? 500 : 400;
+        await new Promise(resolve => setTimeout(resolve, initialDelay));
+
+        const videoInfo = getCurrentVideoInfo();
+        console.log('[Audio Mode] Video info:', videoInfo, 'Retry:', retryCount);
+
+        // If we can't get video info, retry a few times before giving up
+        // Check for both channelId AND videoTitle to ensure keyword filtering works
+        if (!videoInfo || !videoInfo.channelId || !videoInfo.videoTitle) {
+            if (retryCount < MAX_RETRIES) {
+                console.log('[Audio Mode] No video info yet, retrying...');
+                setTimeout(() => applyFilteredMode(retryCount + 1), RETRY_DELAY);
+                return;
+            }
+
+            // Max retries reached - disable audio mode
+            if (audioModeEnabled) {
+                console.log('[Audio Mode] No video info after retries - disabling');
+                disableAudioMode(true);
+            }
+            return;
+        }
+
+        // Track this video
+        lastAppliedVideoId = videoInfo.videoId;
+
+        // Check whitelist only
+        const shouldEnable = checkWhitelist(videoInfo, result.filterRules);
+        console.log('[Audio Mode] Should enable:', shouldEnable);
+
+        if (shouldEnable) {
+            if (!audioModeEnabled) {
+                console.log('[Audio Mode] Whitelist match - enabling');
+                enableAudioMode(true);
+            } else {
+                // Already enabled but navigated to new video - re-apply quality
+                console.log('[Audio Mode] Already enabled, re-applying 144p quality');
+                setLowestQuality();
+            }
+        } else {
+            // No match - normal video
+            if (audioModeEnabled) {
+                console.log('[Audio Mode] No whitelist match - disabling');
+                disableAudioMode(true);
+            } else {
+                // Not in audio mode - apply user's preferred quality
+                console.log('[Audio Mode] Normal video - applying preferred quality');
+                applyPreferredQuality();
+            }
+        }
+    } catch (error) {
+        console.error('[Audio Mode] Error in filtered mode:', error);
+    }
+}
+
+/**
+ * Check if video matches whitelist (channels or keywords)
+ */
+function checkWhitelist(videoInfo, filterRules) {
+    if (!videoInfo || !filterRules) return false;
+
+    const { videoTitle, channelId } = videoInfo;
+    const whitelist = filterRules.whitelist;
+
+    if (!whitelist) return false;
+
+    // Check channel whitelist
+    if (channelId && whitelist.channels?.length > 0) {
+        const match = whitelist.channels.find(c => c.id === channelId);
+        if (match) {
+            console.log(`[Audio Mode] Channel match: ${match.name}`);
+            return true;
+        }
+    }
+
+    // Check keyword whitelist
+    if (videoTitle && whitelist.keywords?.length > 0) {
+        const titleLower = videoTitle.toLowerCase();
+        for (const kw of whitelist.keywords) {
+            const pattern = kw.keyword.toLowerCase();
+            if (titleLower.includes(pattern)) {
+                console.log(`[Audio Mode] Keyword match: "${kw.keyword}"`);
+                return true;
+            }
+        }
+    }
+
+    return false;
 }
 
 // ===== HELPER FUNCTIONS =====
@@ -112,18 +298,151 @@ function clearVideoCache() {
     cachedVideoElement = null;
 }
 
+// ===== VIDEO INFO EXTRACTION (for whitelist/blacklist) =====
+
+/**
+ * Extract channel information from YouTube page
+ * Uses DOM-based extraction which is more reliable after SPA navigation
+ * @returns {Object|null} Channel info or null
+ */
+function extractChannelInfo() {
+    try {
+        // Method 1: DOM-based extraction (most reliable for SPA navigation)
+        // Try multiple selectors for channel link
+        const channelSelectors = [
+            '#owner ytd-channel-name a',
+            'ytd-video-owner-renderer ytd-channel-name a',
+            '#channel-name a',
+            'ytd-channel-name a'
+        ];
+
+        for (const selector of channelSelectors) {
+            const channelLink = document.querySelector(selector);
+            if (channelLink) {
+                const href = channelLink.getAttribute('href');
+                const channelName = channelLink.textContent?.trim();
+
+                // Extract channel ID from href
+                let channelId = null;
+                if (href) {
+                    // Match /channel/UCxxxxxx pattern
+                    const channelIdMatch = href.match(/\/channel\/(UC[a-zA-Z0-9_-]+)/);
+                    if (channelIdMatch) {
+                        channelId = channelIdMatch[1];
+                    } else {
+                        // Match /@username pattern - use the href as identifier
+                        const handleMatch = href.match(/\/@([^\/\?]+)/);
+                        if (handleMatch) {
+                            channelId = `@${handleMatch[1]}`;
+                        }
+                    }
+                }
+
+                if (channelId && channelName) {
+                    console.log(`[Audio Mode] Channel found: ${channelName} (${channelId})`);
+                    return { channelId, channelName };
+                }
+            }
+        }
+
+        // Method 2: Try ytInitialPlayerResponse (embedded in page)
+        const scripts = document.querySelectorAll('script');
+        for (const script of scripts) {
+            const text = script.textContent;
+            if (text && text.includes('ytInitialPlayerResponse')) {
+                const match = text.match(/ytInitialPlayerResponse\s*=\s*(\{.+?\});/s);
+                if (match) {
+                    try {
+                        const data = JSON.parse(match[1]);
+                        const channelId = data?.videoDetails?.channelId;
+                        const channelName = data?.videoDetails?.author;
+                        if (channelId && channelName) {
+                            return { channelId, channelName };
+                        }
+                    } catch (e) {
+                        // JSON parse failed, continue
+                    }
+                }
+            }
+        }
+
+        return null;
+    } catch (error) {
+        console.error('[Audio Mode] Error extracting channel info:', error);
+        return null;
+    }
+}
+
+/**
+ * Extract current video information from YouTube page
+ * @returns {Object|null} Video info object or null if not available
+ */
+function getCurrentVideoInfo() {
+    try {
+        // Get video ID from URL
+        const videoId = new URLSearchParams(window.location.search).get('v');
+        if (!videoId) return null;
+
+        // Get video title - try multiple sources for SPA navigation compatibility
+        let videoTitle = '';
+
+        // Method 1: document.title (updates during SPA navigation)
+        // Format: "Video Title - YouTube"
+        if (document.title && document.title !== 'YouTube') {
+            videoTitle = document.title.replace(/ - YouTube$/, '').trim();
+        }
+
+        // Method 2: Modern YouTube layout h1 selectors
+        if (!videoTitle) {
+            const h1Selectors = [
+                'h1.ytd-watch-metadata yt-formatted-string',
+                'ytd-watch-metadata h1 yt-formatted-string',
+                '#title h1 yt-formatted-string',
+                'h1.ytd-video-primary-info-renderer'
+            ];
+            for (const selector of h1Selectors) {
+                const h1 = document.querySelector(selector);
+                if (h1?.textContent?.trim()) {
+                    videoTitle = h1.textContent.trim();
+                    break;
+                }
+            }
+        }
+
+        // Method 3: Meta tag (fallback, may be stale during SPA)
+        if (!videoTitle) {
+            const titleMeta = document.querySelector('meta[name="title"]');
+            videoTitle = titleMeta?.getAttribute('content') || '';
+        }
+
+        // Get channel info
+        const channelInfo = extractChannelInfo();
+
+        return {
+            videoId,
+            videoTitle,
+            channelId: channelInfo?.channelId || null,
+            channelName: channelInfo?.channelName || null
+        };
+    } catch (error) {
+        console.error('[Audio Mode] Error extracting video info:', error);
+        return null;
+    }
+}
+
 // Listen for messages from popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
-    if (request.action === 'toggleAudioMode') {
-        if (audioModeEnabled) {
-            disableAudioMode();
-        } else {
-            enableAudioMode();
-        }
-        sendResponse({ enabled: audioModeEnabled });
+    if (request.action === 'modeChanged') {
+        // Mode was changed in popup
+        currentModeType = request.mode;
+        lastAppliedVideoId = null; // Force re-evaluation
+        applyModeLogic().then(() => {
+            sendResponse({ success: true });
+        });
+        return true; // Keep channel open for async
     } else if (request.action === 'getStatus') {
-        sendResponse({ enabled: audioModeEnabled });
+        sendResponse({ enabled: audioModeEnabled, mode: currentModeType });
     } else if (request.action === 'updateTheme') {
         updateOverlayTheme(request.backgroundType, request.backgroundValue);
     } else if (request.action === 'updateLanguage') {
@@ -134,11 +453,29 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             sendResponse({ success: false, error: err.message });
         });
         return true; // Keep message channel open for async response
+    } else if (request.action === 'getVideoInfo') {
+        sendResponse(getCurrentVideoInfo());
     }
     return true;
 });
 
-async function enableAudioMode() {
+// Listen for storage changes to re-apply mode logic
+chrome.storage.onChanged.addListener((changes, namespace) => {
+    if (namespace === 'sync') {
+        if (changes.audioModeType) {
+            // Mode type changed
+            currentModeType = changes.audioModeType.newValue || 'always';
+            lastAppliedVideoId = null;
+            applyModeLogic();
+        } else if (changes.filterRules && currentModeType === 'filtered') {
+            // Filter rules changed while in filtered mode
+            lastAppliedVideoId = null;
+            applyFilteredMode();
+        }
+    }
+});
+
+async function enableAudioMode(fromAutoRule = false) {
     audioModeEnabled = true;
 
     // Find the video player
@@ -146,6 +483,20 @@ async function enableAudioMode() {
     if (!video) {
         setTimeout(enableAudioMode, TIMING.RETRY_DELAY);
         return;
+    }
+
+    // Save current quality before changing (to restore later)
+    // Only save if NOT already in audio mode quality (tiny/small)
+    const player = document.getElementById('movie_player');
+    if (player && player.getPlaybackQuality) {
+        const currentQuality = player.getPlaybackQuality();
+        // Only save if it's a real quality (not audio mode's 144p/240p)
+        if (currentQuality !== 'tiny' && currentQuality !== 'small') {
+            savedQualityBeforeAudioMode = currentQuality;
+            // Persist to storage so it survives page reloads
+            chrome.storage.sync.set({ preferredQuality: currentQuality });
+            console.log('[Audio Mode] Saved quality:', savedQualityBeforeAudioMode);
+        }
     }
 
     // Hide video by making it transparent and small
@@ -181,8 +532,8 @@ async function enableAudioMode() {
 
     setQualityWhenReady();
 
-    // Save preference
-    if (chrome.runtime?.id) {
+    // Save preference (only if manually enabled, not from auto-rules)
+    if (!fromAutoRule && chrome.runtime?.id) {
         try {
             chrome.storage.sync.set({ audioMode: true });
         } catch (error) {
@@ -194,7 +545,7 @@ async function enableAudioMode() {
     startUsageTracking();
 }
 
-function disableAudioMode() {
+function disableAudioMode(fromAutoRule = false) {
     audioModeEnabled = false;
 
     // Find the video player
@@ -214,6 +565,12 @@ function disableAudioMode() {
         delete player.__audioModeQualityAttempted;
     }
 
+    // Cancel any pending quality setting operations
+    currentQualityOperationId++;
+
+    // Reset YouTube's settings UI styles (uses the resetSettingsUIStyles function)
+    resetSettingsUIStyles();
+
     // Clean up video event listeners (reuse video from above)
     if (video) {
         if (videoPlayHandler) {
@@ -232,8 +589,8 @@ function disableAudioMode() {
         audioModeOverlay = null;
     }
 
-    // Save preference
-    if (chrome.runtime?.id) {
+    // Save preference (only if manually disabled, not from auto-rules)
+    if (!fromAutoRule && chrome.runtime?.id) {
         try {
             chrome.storage.sync.set({ audioMode: false });
         } catch (error) {
@@ -251,40 +608,53 @@ function disableAudioMode() {
     stopUsageTracking();
 }
 
+// Track current quality setting operation to cancel stale callbacks
+let currentQualityOperationId = 0;
+
+/**
+ * Reset YouTube player settings UI styles
+ * Call this after any operation that might have hidden the settings panel
+ */
+function resetSettingsUIStyles() {
+    const settingsPanel = document.querySelector('.ytp-settings-menu');
+    const popup = document.querySelector('.ytp-popup');
+
+    if (settingsPanel) {
+        settingsPanel.style.visibility = '';
+        settingsPanel.style.opacity = '';
+        settingsPanel.style.pointerEvents = '';
+    }
+    if (popup) {
+        popup.style.visibility = '';
+        popup.style.opacity = '';
+        popup.style.pointerEvents = '';
+    }
+}
+
 /**
  * Function to interact with YouTube's quality settings UI (invisibly)
  * @param {HTMLVideoElement} video - The video element
  * @param {string} targetText - The text to look for (e.g. '144p', '720p', 'Auto')
  */
 const clickQualitySetting = (video, targetText = '144p') => {
+    // Increment operation ID to invalidate any pending callbacks
+    const operationId = ++currentQualityOperationId;
+
     try {
         const wasPlaying = !video.paused;
         const currentTime = video.currentTime;
 
-        // Hide the settings panel from view
+        // Hide the settings panel from view (re-query each time)
         const settingsPanel = document.querySelector('.ytp-settings-menu');
         const popup = document.querySelector('.ytp-popup');
 
-        // Store original styles to restore later
-        const originalPanelStyles = {};
-        const originalPopupStyles = {};
-
         if (settingsPanel) {
-            originalPanelStyles.visibility = settingsPanel.style.visibility;
-            originalPanelStyles.opacity = settingsPanel.style.opacity;
-            originalPanelStyles.pointerEvents = settingsPanel.style.pointerEvents;
-
-            // Make completely invisible
             settingsPanel.style.visibility = 'hidden';
             settingsPanel.style.opacity = '0';
             settingsPanel.style.pointerEvents = 'none';
         }
 
         if (popup) {
-            originalPopupStyles.visibility = popup.style.visibility;
-            originalPopupStyles.opacity = popup.style.opacity;
-            originalPopupStyles.pointerEvents = popup.style.pointerEvents;
-
             popup.style.visibility = 'hidden';
             popup.style.opacity = '0';
             popup.style.pointerEvents = 'none';
@@ -295,6 +665,12 @@ const clickQualitySetting = (video, targetText = '144p') => {
             settingsButton.click();
 
             setTimeout(() => {
+                // Check if this operation is still valid
+                if (operationId !== currentQualityOperationId) {
+                    resetSettingsUIStyles();
+                    return;
+                }
+
                 const qualityMenuItem = Array.from(document.querySelectorAll('.ytp-menuitem')).find(
                     item => item.textContent.toLowerCase().includes('quality')
                 );
@@ -303,6 +679,12 @@ const clickQualitySetting = (video, targetText = '144p') => {
                     qualityMenuItem.click();
 
                     setTimeout(() => {
+                        // Check if this operation is still valid
+                        if (operationId !== currentQualityOperationId) {
+                            resetSettingsUIStyles();
+                            return;
+                        }
+
                         const menuItems = Array.from(document.querySelectorAll('.ytp-menuitem'));
                         const targetOption = menuItems.find(item => item.textContent.includes(targetText));
 
@@ -326,6 +708,12 @@ const clickQualitySetting = (video, targetText = '144p') => {
 
                         // Close and cleanup
                         setTimeout(() => {
+                            // Check if this operation is still valid
+                            if (operationId !== currentQualityOperationId) {
+                                resetSettingsUIStyles();
+                                return;
+                            }
+
                             // Simulate Escape to close
                             const escapeEvent = new KeyboardEvent('keydown', {
                                 key: 'Escape',
@@ -337,19 +725,10 @@ const clickQualitySetting = (video, targetText = '144p') => {
                             });
                             document.dispatchEvent(escapeEvent);
 
-                            // Restore original styles after a brief delay
+                            // Re-query and restore styles after a brief delay
                             setTimeout(() => {
-                                if (settingsPanel) {
-                                    settingsPanel.style.visibility = originalPanelStyles.visibility || '';
-                                    settingsPanel.style.opacity = originalPanelStyles.opacity || '';
-                                    settingsPanel.style.pointerEvents = originalPanelStyles.pointerEvents || '';
-                                }
-
-                                if (popup) {
-                                    popup.style.visibility = originalPopupStyles.visibility || '';
-                                    popup.style.opacity = originalPopupStyles.opacity || '';
-                                    popup.style.pointerEvents = originalPopupStyles.pointerEvents || '';
-                                }
+                                // Always reset styles, regardless of operation validity
+                                resetSettingsUIStyles();
 
                                 if (wasPlaying && video.paused) {
                                     video.currentTime = currentTime;
@@ -358,11 +737,15 @@ const clickQualitySetting = (video, targetText = '144p') => {
                             }, 200);
                         }, 100);
                     }, 300);
+                } else {
+                    // No quality menu found, cleanup
+                    resetSettingsUIStyles();
                 }
             }, 300);
         }
     } catch (error) {
         console.error('[Audio Mode] Error in invisible UI interaction:', error);
+        resetSettingsUIStyles();
     }
 };
 
@@ -437,7 +820,8 @@ const forceLowestQuality = (player, video) => {
 };
 
 /**
- * Restore quality to 720p (or auto if unavailable)
+ * Restore quality to user's previous setting
+ * Uses saved quality from session, falls back to stored preference, then 720p
  * Includes retry logic for reliability
  * @param {number} attempts - Number of retry attempts remaining
  */
@@ -452,65 +836,94 @@ const restoreQuality = (attempts = 3) => {
         return;
     }
 
-    try {
-        const availableLevels = player.getAvailableQualityLevels ? player.getAvailableQualityLevels() : [];
+    // Load from storage to get user's preferred quality as fallback
+    chrome.storage.sync.get(['preferredQuality'], (result) => {
+        try {
+            const availableLevels = player.getAvailableQualityLevels ? player.getAvailableQualityLevels() : [];
 
-        let target = QUALITY.RESTORE;
-        let uiTargetText = '720p';
+            // Map quality codes to UI text for click fallback
+            const qualityToText = {
+                'hd2160': '2160p',
+                'hd1440': '1440p',
+                'hd1080': '1080p',
+                'hd720': '720p',
+                'large': '480p',
+                'medium': '360p',
+                'small': '240p',
+                'tiny': '144p',
+                'auto': 'Auto'
+            };
 
-        // If 720p is not available, fallback to auto
-        if (availableLevels.length > 0 && !availableLevels.includes(QUALITY.RESTORE)) {
-            target = 'auto';
-            uiTargetText = 'Auto';
-        }
-
-        // Apply quality restoration using robust methods
-        if (player.setPlaybackQualityRange) {
-            // Clear any existing range constraint first (important for breaking manual locks)
-            player.setPlaybackQualityRange('auto', 'auto');
-
-            // Then set specific if not auto
-            if (target !== 'auto') {
-                player.setPlaybackQualityRange(target, target);
+            // Use saved quality from session, then stored preference, then 720p
+            // NEVER restore to audio mode qualities (tiny/small)
+            let target = savedQualityBeforeAudioMode;
+            if (!target || target === 'tiny' || target === 'small') {
+                // Fall back to stored preference (last quality user used)
+                target = result.preferredQuality;
             }
-        }
+            if (!target || target === 'tiny' || target === 'small') {
+                // Last resort: 720p
+                target = QUALITY.RESTORE;
+            }
+            let uiTargetText = qualityToText[target] || '720p';
 
-        if (player.setPlaybackQuality) {
-            player.setPlaybackQuality(target);
-        }
+            console.log('[Audio Mode] Restoring quality to:', target);
 
-        if (player.setInternalQuality) {
-            player.setInternalQuality(target);
-        }
+            // If saved quality is not available, fallback to auto
+            if (availableLevels.length > 0 && !availableLevels.includes(target)) {
+                target = 'auto';
+                uiTargetText = 'Auto';
+            }
 
-        if (player.setPreferredQuality) {
-            player.setPreferredQuality(target);
-        }
+            // Clear session saved quality after restoring (keep storage preference)
+            savedQualityBeforeAudioMode = null;
 
-        // VERIFY and FALBACK/RETRY
-        setTimeout(() => {
-            const currentQuality = player.getPlaybackQuality ? player.getPlaybackQuality() : 'unknown';
+            // Apply quality restoration using robust methods
+            if (player.setPlaybackQualityRange) {
+                // Clear any existing range constraint first (important for breaking manual locks)
+                player.setPlaybackQualityRange('auto', 'auto');
 
-            // If not successful yet...
-            if (target === QUALITY.RESTORE && currentQuality !== QUALITY.RESTORE) {
-                if (attempts > 0) {
-                    // Try UI click as part of retry if API failed
-                    clickQualitySetting(video, uiTargetText);
-
-                    // Schedule next retry
-                    setTimeout(() => restoreQuality(attempts - 1), 800);
-                } else {
+                // Then set specific if not auto
+                if (target !== 'auto') {
+                    player.setPlaybackQualityRange(target, target);
                 }
-            } else {
             }
-        }, 500);
 
-    } catch (e) {
-        console.error('[Audio Mode] Error restoring quality:', e);
-        if (attempts > 0) {
-            setTimeout(() => restoreQuality(attempts - 1), 1000);
+            if (player.setPlaybackQuality) {
+                player.setPlaybackQuality(target);
+            }
+
+            if (player.setInternalQuality) {
+                player.setInternalQuality(target);
+            }
+
+            if (player.setPreferredQuality) {
+                player.setPreferredQuality(target);
+            }
+
+            // VERIFY and FALLBACK/RETRY
+            setTimeout(() => {
+                const currentQuality = player.getPlaybackQuality ? player.getPlaybackQuality() : 'unknown';
+
+                // If not successful yet...
+                if (target !== 'auto' && currentQuality !== target) {
+                    if (attempts > 0) {
+                        // Try UI click as part of retry if API failed
+                        clickQualitySetting(video, uiTargetText);
+
+                        // Schedule next retry
+                        setTimeout(() => restoreQuality(attempts - 1), 800);
+                    }
+                }
+            }, 500);
+
+        } catch (e) {
+            console.error('[Audio Mode] Error restoring quality:', e);
+            if (attempts > 0) {
+                setTimeout(() => restoreQuality(attempts - 1), 1000);
+            }
         }
-    }
+    });
 };
 
 function startUsageTracking() {
@@ -745,6 +1158,7 @@ async function updateOverlayLanguage() {
 // Handle YouTube's SPA navigation with optimized MutationObserver
 let lastUrl = location.href;
 let navigationObserver = null;
+let navigationDebounceTimer = null;
 
 function initNavigationObserver() {
     if (navigationObserver) return;
@@ -757,13 +1171,18 @@ function initNavigationObserver() {
         if (url !== lastUrl) {
             lastUrl = url;
             clearVideoCache(); // Clear cached video element on navigation
+            lastAppliedVideoId = null; // Reset for new video
 
-            if (audioModeEnabled) {
-                // Re-apply audio mode after navigation
-                setTimeout(() => {
-                    enableAudioMode();
-                }, TIMING.RETRY_DELAY);
+            // Debounce to avoid multiple rapid calls during SPA transition
+            if (navigationDebounceTimer) {
+                clearTimeout(navigationDebounceTimer);
             }
+
+            // Wait for YouTube to update DOM before applying mode logic
+            navigationDebounceTimer = setTimeout(() => {
+                console.log('[Audio Mode] Navigation detected, re-applying mode logic');
+                applyModeLogic();
+            }, 600); // Wait 600ms for YouTube to update DOM
         }
     });
 
@@ -775,6 +1194,50 @@ function initNavigationObserver() {
 
 // Initialize observer
 initNavigationObserver();
+
+// Listen for YouTube's navigation finish event (more reliable than MutationObserver alone)
+document.addEventListener('yt-navigate-finish', () => {
+    console.log('[Audio Mode] yt-navigate-finish event fired');
+    clearVideoCache();
+    lastAppliedVideoId = null;
+
+    // Small delay to ensure video player is ready
+    setTimeout(() => {
+        applyModeLogic();
+    }, 300);
+});
+
+// Also listen for video element becoming ready
+// This handles cases where mode logic runs before video is fully loaded
+let videoReadyObserver = null;
+
+function setupVideoReadyListener() {
+    const video = document.querySelector('video');
+    if (!video) {
+        // Retry if video not found yet
+        setTimeout(setupVideoReadyListener, 500);
+        return;
+    }
+
+    // Listen for video source changes (new video loaded)
+    video.addEventListener('loadeddata', () => {
+        console.log('[Audio Mode] Video loadeddata event');
+        // Re-apply quality after video loads
+        if (audioModeEnabled) {
+            // Audio mode enabled - ensure 144p quality
+            setLowestQuality();
+        } else if (currentModeType === 'always') {
+            // Always mode but not enabled yet - enable it
+            enableAudioMode(true);
+        } else {
+            // Filtered mode and not enabled - apply preferred quality
+            applyPreferredQuality();
+        }
+    });
+}
+
+// Initialize video listener
+setupVideoReadyListener();
 
 // Cleanup on extension unload
 window.addEventListener('beforeunload', () => {

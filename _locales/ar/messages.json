@@ -63,6 +63,26 @@
         "message": "وضع الصوت مفعل",
         "description": "Status text when audio mode is on"
     },
+    "modeAlwaysOn": {
+        "message": "تفعيل دائم",
+        "description": "Mode selector: always enable audio mode"
+    },
+    "modeFiltered": {
+        "message": "مُصفّى",
+        "description": "Mode selector: enable based on filter rules"
+    },
+    "configureFilters": {
+        "message": "إعداد الفلاتر",
+        "description": "Button to open filter configuration"
+    },
+    "modeAlwaysOnDesc": {
+        "message": "وضع الصوت على كل الفيديوهات",
+        "description": "Description for always on mode"
+    },
+    "modeFilteredDesc": {
+        "message": "حسب قواعد التصفية",
+        "description": "Description for filtered mode"
+    },
     "shortcut": {
         "message": "الاختصار (اضغط للتغيير):",
         "description": "Label for keyboard shortcut display"
@@ -146,5 +166,105 @@
     "activeDesc": {
         "message": "نقوم بتوفير باقتك",
         "description": "Overlay description when audio mode is active"
+    },
+    "filterRules": {
+        "message": "قواعد التصفية",
+        "description": "Filter panel header"
+    },
+    "autoRules": {
+        "message": "تفعيل القواعد التلقائية",
+        "description": "Toggle label for automatic rule application"
+    },
+    "alwaysEnable": {
+        "message": "تفعيل دائم",
+        "description": "Button to always enable audio mode for this channel"
+    },
+    "alwaysDisable": {
+        "message": "إيقاف دائم",
+        "description": "Button to always disable audio mode for this channel"
+    },
+    "addKeyword": {
+        "message": "إضافة كلمة مفتاحية",
+        "description": "Label for keyword input section"
+    },
+    "currentChannel": {
+        "message": "القناة الحالية",
+        "description": "Label for current channel section"
+    },
+    "notOnVideo": {
+        "message": "لست على فيديو",
+        "description": "Message when not on a YouTube video page"
+    },
+    "channelNotFound": {
+        "message": "القناة غير موجودة",
+        "description": "Message when channel info cannot be extracted"
+    },
+    "whitelist": {
+        "message": "القائمة البيضاء",
+        "description": "Whitelist label"
+    },
+    "blacklist": {
+        "message": "القائمة السوداء",
+        "description": "Blacklist label"
+    },
+    "keyword": {
+        "message": "كلمة مفتاحية",
+        "description": "Keyword rule type"
+    },
+    "channelId": {
+        "message": "معرف القناة",
+        "description": "Channel rule type"
+    },
+    "channels": {
+        "message": "القنوات",
+        "description": "Channels list header"
+    },
+    "keywords": {
+        "message": "الكلمات المفتاحية",
+        "description": "Keywords list header"
+    },
+    "noChannels": {
+        "message": "لا توجد قنوات",
+        "description": "Empty state for channels list"
+    },
+    "noKeywords": {
+        "message": "لا توجد كلمات مفتاحية",
+        "description": "Empty state for keywords list"
+    },
+    "add": {
+        "message": "إضافة",
+        "description": "Add button text"
+    },
+    "remove": {
+        "message": "إزالة",
+        "description": "Remove button text"
+    },
+    "enterKeyword": {
+        "message": "أدخل كلمة مفتاحية",
+        "description": "Placeholder for keyword input"
+    },
+    "enterChannelId": {
+        "message": "أدخل معرف القناة (UC...)",
+        "description": "Placeholder for channel ID input"
+    },
+    "ruleAdded": {
+        "message": "تمت إضافة القاعدة",
+        "description": "Toast message when rule is added"
+    },
+    "ruleRemoved": {
+        "message": "تمت إزالة القاعدة",
+        "description": "Toast message when rule is removed"
+    },
+    "filterHint": {
+        "message": "الفيديوهات المطابقة للقنوات أو الكلمات المفتاحية أدناه ستعمل في وضع الصوت. باقي الفيديوهات ستعمل بشكل عادي.",
+        "description": "Hint explaining how the filter works"
+    },
+    "preferredQuality": {
+        "message": "الجودة المفضلة",
+        "description": "Label for quality selector in settings"
+    },
+    "qualityHint": {
+        "message": "الجودة المستخدمة عند إيقاف وضع الصوت",
+        "description": "Hint text for quality selector"
     }
 }

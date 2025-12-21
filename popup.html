@@ -87,19 +87,115 @@
                     </div>
                     <p class="hint" data-i18n="imageHint">Paste a direct link to an image.</p>
                 </div>
+
+                <div class="setting-group">
+                    <label data-i18n="preferredQuality">Preferred Quality</label>
+                    <p class="hint" data-i18n="qualityHint">Quality to use when audio mode is off</p>
+                    <select id="quality-select" class="quality-select">
+                        <option value="hd2160">2160p (4K)</option>
+                        <option value="hd1440">1440p</option>
+                        <option value="hd1080">1080p</option>
+                        <option value="hd720" selected>720p</option>
+                        <option value="large">480p</option>
+                        <option value="medium">360p</option>
+                        <option value="auto">Auto</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div id="filter-panel" class="settings-panel">
+            <div class="settings-header">
+                <h2 data-i18n="filterRules">Filter Rules</h2>
+                <button id="close-filter" class="icon-btn">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 6L6 18M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+
+            <div class="settings-content">
+                <div class="filter-hint">
+                    <p data-i18n="filterHint">Videos matching channels or keywords below will play in audio mode. All other videos play normally.</p>
+                </div>
+
+                <div class="setting-group" id="quick-add-section">
+                    <label data-i18n="currentChannel">Current Channel</label>
+                    <div class="quick-add-card">
+                        <div class="channel-info">
+                            <span id="current-channel-name" data-i18n="notOnVideo">Not on a video</span>
+                        </div>
+                        <button id="quick-add-channel" class="quick-btn whitelist full-width" disabled>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="12" y1="5" x2="12" y2="19"></line>
+                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                            </svg>
+                            <span data-i18n="add">Add</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="setting-group">
+                    <div class="add-rule-section">
+                        <label data-i18n="addKeyword">Add Keyword</label>
+                        <div class="input-group">
+                            <input type="text" id="new-rule-input" data-i18n-placeholder="enterKeyword" placeholder="Enter keyword">
+                            <button id="add-rule-btn" data-i18n="add">Add</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="setting-group">
+                    <label data-i18n="channels">Channels</label>
+                    <div class="rules-list" id="channels-list">
+                        <div class="empty-state" data-i18n="noChannels">No channels added</div>
+                    </div>
+                </div>
+
+                <div class="setting-group">
+                    <label data-i18n="keywords">Keywords</label>
+                    <div class="rules-list" id="keywords-list">
+                        <div class="empty-state" data-i18n="noKeywords">No keywords added</div>
+                    </div>
+                </div>
             </div>
         </div>
 
         <div class="content">
-            <div class="toggle-section">
-                <div class="toggle-info">
-                    <h2 data-i18n="audioOnly">Audio Only</h2>
-                    <p id="status-text" data-i18n="statusOff">Click to enable</p>
+            <div class="mode-selector-section">
+                <h2 data-i18n="audioOnly">Audio Only</h2>
+                <div class="mode-selector">
+                    <button class="mode-btn active" data-mode="always" id="mode-always">
+                        <div class="mode-icon">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path>
+                                <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                                <line x1="12" y1="19" x2="12" y2="22"></line>
+                            </svg>
+                        </div>
+                        <div class="mode-text">
+                            <span class="mode-name" data-i18n="modeAlwaysOn">Always On</span>
+                            <span class="mode-desc" data-i18n="modeAlwaysOnDesc">Audio mode on all videos</span>
+                        </div>
+                    </button>
+                    <button class="mode-btn" data-mode="filtered" id="mode-filtered">
+                        <div class="mode-icon">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+                            </svg>
+                        </div>
+                        <div class="mode-text">
+                            <span class="mode-name" data-i18n="modeFiltered">Filtered</span>
+                            <span class="mode-desc" data-i18n="modeFilteredDesc">Based on your filter rules</span>
+                        </div>
+                    </button>
                 </div>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="audioToggle">
-                    <span class="slider"></span>
-                </label>
+                <button id="configure-filters-btn" class="configure-filters-btn hidden">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+                    </svg>
+                    <span data-i18n="configureFilters">Configure Filters</span>
+                </button>
             </div>
 
             <div class="shortcuts-hint">

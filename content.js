@@ -70,7 +70,7 @@ async function loadMessages(lang) {
 // Initialize by checking saved preference
 if (chrome.runtime?.id) {
     try {
-        chrome.storage.sync.get(['audioModeType', 'language', 'preferredQuality'], async function (result) {
+        chrome.storage.sync.get(['audioModeType', 'language', 'preferredQuality', 'qualityBeforeAudioMode'], async function (result) {
             if (chrome.runtime.lastError) {
                 console.log('[Audio Mode] Could not load initial state:', chrome.runtime.lastError);
                 return;
@@ -85,10 +85,14 @@ if (chrome.runtime?.id) {
                 await loadMessages(detectedLang);
             }
 
-            // Load user's preferred quality (for restore after audio mode)
-            if (result.preferredQuality) {
+            // Load saved quality before audio mode (from previous session)
+            // Prioritize qualityBeforeAudioMode, fall back to user's preferredQuality setting
+            if (result.qualityBeforeAudioMode) {
+                savedQualityBeforeAudioMode = result.qualityBeforeAudioMode;
+                console.log('[Audio Mode] Loaded quality before audio mode:', savedQualityBeforeAudioMode);
+            } else if (result.preferredQuality) {
                 savedQualityBeforeAudioMode = result.preferredQuality;
-                console.log('[Audio Mode] Loaded preferred quality:', savedQualityBeforeAudioMode);
+                console.log('[Audio Mode] Using user preferred quality as fallback:', savedQualityBeforeAudioMode);
             }
 
             // Set the current mode type
@@ -494,7 +498,8 @@ async function enableAudioMode(fromAutoRule = false) {
         if (currentQuality !== 'tiny' && currentQuality !== 'small') {
             savedQualityBeforeAudioMode = currentQuality;
             // Persist to storage so it survives page reloads
-            chrome.storage.sync.set({ preferredQuality: currentQuality });
+            // Use separate key to avoid overwriting user's preferred quality setting
+            chrome.storage.sync.set({ qualityBeforeAudioMode: currentQuality });
             console.log('[Audio Mode] Saved quality:', savedQualityBeforeAudioMode);
         }
     }
@@ -836,8 +841,8 @@ const restoreQuality = (attempts = 3) => {
         return;
     }
 
-    // Load from storage to get user's preferred quality as fallback
-    chrome.storage.sync.get(['preferredQuality'], (result) => {
+    // Load from storage to get quality preferences
+    chrome.storage.sync.get(['preferredQuality', 'qualityBeforeAudioMode'], (result) => {
         try {
             const availableLevels = player.getAvailableQualityLevels ? player.getAvailableQualityLevels() : [];
 
@@ -854,12 +859,20 @@ const restoreQuality = (attempts = 3) => {
                 'auto': 'Auto'
             };
 
-            // Use saved quality from session, then stored preference, then 720p
+            // Priority for quality restoration:
+            // 1. In-memory saved quality (from this session)
+            // 2. User's explicit preferred quality setting (from popup)
+            // 3. Stored quality before audio mode (from storage, for page reloads)
+            // 4. Default 720p
             // NEVER restore to audio mode qualities (tiny/small)
             let target = savedQualityBeforeAudioMode;
             if (!target || target === 'tiny' || target === 'small') {
-                // Fall back to stored preference (last quality user used)
+                // Fall back to user's explicit preferred quality setting
                 target = result.preferredQuality;
+            }
+            if (!target || target === 'tiny' || target === 'small') {
+                // Fall back to stored quality before audio mode (page reload scenario)
+                target = result.qualityBeforeAudioMode;
             }
             if (!target || target === 'tiny' || target === 'small') {
                 // Last resort: 720p
@@ -875,8 +888,10 @@ const restoreQuality = (attempts = 3) => {
                 uiTargetText = 'Auto';
             }
 
-            // Clear session saved quality after restoring (keep storage preference)
+            // Clear session saved quality after restoring
             savedQualityBeforeAudioMode = null;
+            // Also clear from storage (keep user's preferredQuality untouched)
+            chrome.storage.sync.remove('qualityBeforeAudioMode');
 
             // Apply quality restoration using robust methods
             if (player.setPlaybackQualityRange) {

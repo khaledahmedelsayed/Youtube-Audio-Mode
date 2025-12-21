@@ -640,10 +640,12 @@ async function addRule(ruleType, value) {
         whitelist: { channels: [], keywords: [] }
     };
 
-    // Ensure whitelist exists
+    // Ensure whitelist and its arrays exist
     if (!rules.whitelist) {
         rules.whitelist = { channels: [], keywords: [] };
     }
+    if (!rules.whitelist.channels) rules.whitelist.channels = [];
+    if (!rules.whitelist.keywords) rules.whitelist.keywords = [];
 
     if (ruleType === 'channel') {
         // For channel, value should be { id, name }
@@ -678,6 +680,10 @@ async function removeRule(dataset) {
     const result = await chrome.storage.sync.get(['filterRules']);
     const rules = result.filterRules;
     if (!rules || !rules.whitelist) return;
+
+    // Ensure arrays exist before filtering
+    if (!rules.whitelist.channels) rules.whitelist.channels = [];
+    if (!rules.whitelist.keywords) rules.whitelist.keywords = [];
 
     if (dataset.type === 'channel') {
         rules.whitelist.channels = rules.whitelist.channels.filter(c => c.id !== dataset.id);
@@ -737,10 +743,11 @@ quickAddChannelBtn.addEventListener('click', async () => {
     const result = await chrome.storage.sync.get(['filterRules']);
     const rules = result.filterRules || { whitelist: { channels: [], keywords: [] } };
 
-    // Ensure whitelist exists
+    // Ensure whitelist and its arrays exist
     if (!rules.whitelist) {
         rules.whitelist = { channels: [], keywords: [] };
     }
+    if (!rules.whitelist.channels) rules.whitelist.channels = [];
 
     const existingIndex = rules.whitelist.channels.findIndex(c => c.id === currentVideoInfo.channelId);
 

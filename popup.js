@@ -1,9 +1,12 @@
 // Popup script for YouTube Audio Mode extension
 
-const audioToggle = document.getElementById('audioToggle');
-const statusText = document.getElementById('status-text');
-const toggleSection = document.querySelector('.toggle-section');
+const modeAlwaysBtn = document.getElementById('mode-always');
+const modeFilteredBtn = document.getElementById('mode-filtered');
+const configureFiltersBtn = document.getElementById('configure-filters-btn');
 const langBtn = document.getElementById('lang-btn');
+
+// Current audio mode type: 'always' or 'filtered'
+let currentModeType = 'always';
 
 // Current language and loaded messages
 let currentLang = 'en';
@@ -61,9 +64,8 @@ async function setLanguage(lang) {
         urlInput.placeholder = 'https://example.com/image.jpg';
     }
 
-    // Update dynamic status text if needed
-    updateUI(audioToggle.checked);
-    updateStats(); // Refresh stats to apply new units
+    // Refresh stats to apply new units
+    updateStats();
 
     // Save preference
     chrome.storage.sync.set({ language: lang });
@@ -95,83 +97,61 @@ langBtn.addEventListener('click', () => {
     setLanguage(newLang);
 });
 
-// Initialize popup state
-chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-    const currentTab = tabs[0];
-
-    // Check if we're on YouTube watch page
-    if (!currentTab || !currentTab.url || !currentTab.url.match(/youtube\.com\/watch/)) {
-        statusText.textContent = t('onlyYoutube');
-        audioToggle.disabled = true;
-        toggleSection.style.opacity = '0.5';
-        return;
-    }
-
-    // Get current audio mode status from content script
-    chrome.tabs.sendMessage(currentTab.id, { action: 'getStatus' })
-        .then((response) => {
-            if (response) {
-                updateUI(response.enabled);
-            } else {
-                // Fallback to storage
-                checkStorageState();
-            }
-        })
-        .catch((error) => {
-            // Content script not ready yet, check storage
-            console.log('Content script not ready:', error.message);
-            checkStorageState();
-        });
+// Initialize popup state - load saved mode type
+chrome.storage.sync.get(['audioModeType'], (result) => {
+    currentModeType = result.audioModeType || 'always';
+    updateModeUI(currentModeType);
 });
 
-// Fallback function to check storage
-function checkStorageState() {
-    chrome.storage.sync.get(['audioMode'], (result) => {
-        updateUI(result.audioMode || false);
-    });
+// Update mode selector UI
+function updateModeUI(mode) {
+    // Update button states
+    if (mode === 'always') {
+        modeAlwaysBtn.classList.add('active');
+        modeFilteredBtn.classList.remove('active');
+        configureFiltersBtn.classList.add('hidden');
+    } else {
+        modeAlwaysBtn.classList.remove('active');
+        modeFilteredBtn.classList.add('active');
+        configureFiltersBtn.classList.remove('hidden');
+    }
 }
 
-// Handle toggle change
-audioToggle.addEventListener('change', () => {
-    const enabled = audioToggle.checked;
+// Handle mode selection
+function selectMode(mode) {
+    if (mode === currentModeType) return;
 
-    // Send message to content script
+    currentModeType = mode;
+    updateModeUI(mode);
+
+    // Save to storage
+    chrome.storage.sync.set({ audioModeType: mode });
+
+    // Notify content script about mode change
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
         const currentTab = tabs[0];
-
-        chrome.tabs.sendMessage(currentTab.id, { action: 'toggleAudioMode' })
-            .then((response) => {
-                if (response) {
-                    updateUI(response.enabled);
-                }
-            })
-            .catch((error) => {
-                console.log('Could not send message to content script:', error.message);
-                // Update storage directly as fallback
-                chrome.storage.sync.set({ audioMode: enabled }, () => {
-                    updateUI(enabled);
-                    // Reload the tab to apply changes
-                    if (currentTab && currentTab.url && currentTab.url.match(/youtube\.com\/watch/)) {
-                        chrome.tabs.reload(currentTab.id);
-                    }
-                });
+        if (currentTab?.url?.includes('youtube.com')) {
+            chrome.tabs.sendMessage(currentTab.id, {
+                action: 'modeChanged',
+                mode: mode
+            }).catch(() => {
+                // Content script not ready, will pick up from storage
             });
+        }
     });
-});
-
-function updateUI(enabled) {
-    audioToggle.checked = enabled;
-
-    if (enabled) {
-        statusText.textContent = t('statusOn');
-        statusText.classList.add('active');
-        toggleSection.classList.add('active');
-    } else {
-        statusText.textContent = t('statusOff');
-        statusText.classList.remove('active');
-        toggleSection.classList.remove('active');
-    }
 }
+
+// Mode button click handlers
+modeAlwaysBtn.addEventListener('click', () => selectMode('always'));
+modeFilteredBtn.addEventListener('click', () => selectMode('filtered'));
+
+// Configure filters button opens the filter panel
+configureFiltersBtn.addEventListener('click', () => {
+    filterPanel.classList.add('open');
+    document.body.classList.add('panel-open');
+    loadFilterRules();
+    fetchCurrentVideoInfo();
+});
 
 // Stats Update Logic
 let currentFilter = 'month'; // 'month' or 'all'
@@ -384,10 +364,12 @@ const applyImageBtn = document.getElementById('apply-image-btn');
 // Toggle Settings Panel
 settingsBtn.addEventListener('click', () => {
     settingsPanel.classList.add('open');
+    document.body.classList.add('panel-open');
 });
 
 closeSettingsBtn.addEventListener('click', () => {
     settingsPanel.classList.remove('open');
+    document.body.classList.remove('panel-open');
 });
 
 // Load Saved Settings
@@ -481,6 +463,22 @@ applyImageBtn.addEventListener('click', () => {
     }
 });
 
+// --- Quality Selector Logic ---
+const qualitySelect = document.getElementById('quality-select');
+
+// Load saved quality preference
+chrome.storage.sync.get(['preferredQuality'], (result) => {
+    if (result.preferredQuality && qualitySelect) {
+        qualitySelect.value = result.preferredQuality;
+    }
+});
+
+// Save quality preference on change
+qualitySelect.addEventListener('change', () => {
+    const quality = qualitySelect.value;
+    chrome.storage.sync.set({ preferredQuality: quality });
+});
+
 function getCurrentColorValue() {
     // Check if a preset is active
     const activePreset = document.querySelector('.theme-btn.active');
@@ -513,3 +511,254 @@ function saveAndApplyTheme(type, value) {
         }
     });
 }
+
+// --- Filter Rules Panel Logic ---
+
+const filterPanel = document.getElementById('filter-panel');
+const closeFilterBtn = document.getElementById('close-filter');
+const quickAddChannelBtn = document.getElementById('quick-add-channel');
+const newRuleInput = document.getElementById('new-rule-input');
+const addRuleBtn = document.getElementById('add-rule-btn');
+
+let currentVideoInfo = null;
+
+closeFilterBtn.addEventListener('click', () => {
+    filterPanel.classList.remove('open');
+    document.body.classList.remove('panel-open');
+});
+
+// Fetch current video info from content script
+async function fetchCurrentVideoInfo() {
+    const currentChannelName = document.getElementById('current-channel-name');
+
+    try {
+        const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+        const currentTab = tabs[0];
+
+        if (!currentTab?.url?.match(/youtube\.com\/watch/)) {
+            currentChannelName.textContent = t('notOnVideo');
+            quickAddChannelBtn.disabled = true;
+            return;
+        }
+
+        const response = await chrome.tabs.sendMessage(currentTab.id, { action: 'getVideoInfo' });
+
+        if (response?.channelName) {
+            currentVideoInfo = response;
+            currentChannelName.textContent = response.channelName;
+            quickAddChannelBtn.disabled = false;
+
+            // Check if already added
+            updateQuickAddButtonState();
+        } else {
+            currentChannelName.textContent = t('channelNotFound');
+            quickAddChannelBtn.disabled = true;
+        }
+    } catch (error) {
+        currentChannelName.textContent = t('notOnVideo');
+        quickAddChannelBtn.disabled = true;
+    }
+}
+
+// Update quick add button state based on current rules
+async function updateQuickAddButtonState() {
+    if (!currentVideoInfo?.channelId) return;
+
+    const result = await chrome.storage.sync.get(['filterRules']);
+    const rules = result.filterRules || { whitelist: { channels: [], keywords: [] } };
+
+    const inWhitelist = rules.whitelist?.channels?.some(c => c.id === currentVideoInfo.channelId) || false;
+
+    quickAddChannelBtn.classList.toggle('active', inWhitelist);
+
+    const btnSpan = quickAddChannelBtn.querySelector('span');
+    if (btnSpan) btnSpan.textContent = inWhitelist ? t('remove') : t('add');
+}
+
+// Load and display filter rules (whitelist-only)
+async function loadFilterRules() {
+    const result = await chrome.storage.sync.get(['filterRules']);
+    const rules = result.filterRules || {
+        whitelist: { channels: [], keywords: [] }
+    };
+
+    // Render the whitelist
+    renderRulesList(rules);
+}
+
+function renderRulesList(rules) {
+    const whitelist = rules.whitelist || { channels: [], keywords: [] };
+
+    // Render channels
+    const channelsList = document.getElementById('channels-list');
+    if (whitelist.channels?.length > 0) {
+        channelsList.innerHTML = whitelist.channels.map(channel => `
+            <div class="rule-item" data-id="${escapeHtml(channel.id)}" data-type="channel">
+                <span class="rule-name">${escapeHtml(channel.name)}</span>
+                <button class="remove-rule-btn" data-id="${escapeHtml(channel.id)}" data-type="channel">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+        `).join('');
+    } else {
+        channelsList.innerHTML = `<div class="empty-state">${t('noChannels')}</div>`;
+    }
+
+    // Render keywords
+    const keywordsList = document.getElementById('keywords-list');
+    if (whitelist.keywords?.length > 0) {
+        keywordsList.innerHTML = whitelist.keywords.map(kw => `
+            <div class="rule-item" data-keyword="${escapeHtml(kw.keyword)}" data-type="keyword">
+                <span class="rule-name">"${escapeHtml(kw.keyword)}"</span>
+                <button class="remove-rule-btn" data-keyword="${escapeHtml(kw.keyword)}" data-type="keyword">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+        `).join('');
+    } else {
+        keywordsList.innerHTML = `<div class="empty-state">${t('noKeywords')}</div>`;
+    }
+
+    // Add event listeners for remove buttons
+    document.querySelectorAll('.remove-rule-btn').forEach(btn => {
+        btn.addEventListener('click', () => removeRule(btn.dataset));
+    });
+}
+
+// Add a new rule to whitelist
+async function addRule(ruleType, value) {
+    if (!value) return;
+
+    const result = await chrome.storage.sync.get(['filterRules']);
+    const rules = result.filterRules || {
+        whitelist: { channels: [], keywords: [] }
+    };
+
+    // Ensure whitelist exists
+    if (!rules.whitelist) {
+        rules.whitelist = { channels: [], keywords: [] };
+    }
+
+    if (ruleType === 'channel') {
+        // For channel, value should be { id, name }
+        if (!rules.whitelist.channels.some(c => c.id === value.id)) {
+            rules.whitelist.channels.push({
+                id: value.id,
+                name: value.name,
+                addedAt: Date.now()
+            });
+        }
+    } else {
+        // For keyword
+        const keyword = typeof value === 'string' ? value.trim() : value;
+        if (keyword && !rules.whitelist.keywords.some(k => k.keyword.toLowerCase() === keyword.toLowerCase())) {
+            rules.whitelist.keywords.push({
+                keyword: keyword,
+                caseSensitive: false,
+                addedAt: Date.now()
+            });
+        }
+    }
+
+    await chrome.storage.sync.set({ filterRules: rules });
+    loadFilterRules();
+
+    // Show feedback
+    showToast(t('ruleAdded'));
+}
+
+// Remove a rule from whitelist
+async function removeRule(dataset) {
+    const result = await chrome.storage.sync.get(['filterRules']);
+    const rules = result.filterRules;
+    if (!rules || !rules.whitelist) return;
+
+    if (dataset.type === 'channel') {
+        rules.whitelist.channels = rules.whitelist.channels.filter(c => c.id !== dataset.id);
+    } else {
+        rules.whitelist.keywords = rules.whitelist.keywords.filter(k => k.keyword !== dataset.keyword);
+    }
+
+    await chrome.storage.sync.set({ filterRules: rules });
+    loadFilterRules();
+    updateQuickAddButtonState();
+
+    showToast(t('ruleRemoved'));
+}
+
+// Helper: Escape HTML
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Helper: Show toast notification
+function showToast(message) {
+    // Create toast element if not exists - append to body for fixed positioning
+    let toast = document.querySelector('.toast');
+    if (!toast) {
+        toast = document.createElement('div');
+        toast.className = 'toast';
+        document.body.appendChild(toast);
+    }
+    toast.textContent = message;
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 2000);
+}
+
+// Add rule button (handles keywords only)
+addRuleBtn.addEventListener('click', () => {
+    const value = newRuleInput.value.trim();
+    if (!value) return;
+
+    addRule('keyword', value);
+    newRuleInput.value = '';
+});
+
+// Enter key to add rule
+newRuleInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+        addRuleBtn.click();
+    }
+});
+
+// Quick add channel button (toggle whitelist)
+quickAddChannelBtn.addEventListener('click', async () => {
+    if (!currentVideoInfo?.channelId) return;
+
+    const result = await chrome.storage.sync.get(['filterRules']);
+    const rules = result.filterRules || { whitelist: { channels: [], keywords: [] } };
+
+    // Ensure whitelist exists
+    if (!rules.whitelist) {
+        rules.whitelist = { channels: [], keywords: [] };
+    }
+
+    const existingIndex = rules.whitelist.channels.findIndex(c => c.id === currentVideoInfo.channelId);
+
+    if (existingIndex >= 0) {
+        // Remove from whitelist
+        rules.whitelist.channels.splice(existingIndex, 1);
+        showToast(t('ruleRemoved'));
+    } else {
+        // Add to whitelist
+        rules.whitelist.channels.push({
+            id: currentVideoInfo.channelId,
+            name: currentVideoInfo.channelName,
+            addedAt: Date.now()
+        });
+        showToast(t('ruleAdded'));
+    }
+
+    await chrome.storage.sync.set({ filterRules: rules });
+    loadFilterRules();
+    updateQuickAddButtonState();
+});

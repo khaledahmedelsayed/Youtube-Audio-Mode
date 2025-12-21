@@ -1,41 +1,47 @@
 // Background script for YouTube Audio Mode
 // Handles keyboard shortcuts and badge updates
 
-// Initialize state
+// Initialize state on install
 chrome.runtime.onInstalled.addListener(() => {
-    chrome.storage.sync.get(['audioMode'], (result) => {
-        const enabled = result.audioMode || false;
-        updateBadge(enabled);
+    chrome.storage.sync.get(['audioModeType'], (result) => {
+        updateBadge(result.audioModeType || 'always');
     });
 
     // Log storage quota on install
     monitorStorageQuota();
 });
 
+// Also initialize badge on startup (not just install)
+chrome.storage.sync.get(['audioModeType'], (result) => {
+    updateBadge(result.audioModeType || 'always');
+});
+
 // Debounced badge update to prevent excessive calls
 let badgeUpdateTimeout = null;
-function debouncedUpdateBadge(enabled) {
+function debouncedUpdateBadge(modeType) {
     if (badgeUpdateTimeout) {
         clearTimeout(badgeUpdateTimeout);
     }
     badgeUpdateTimeout = setTimeout(() => {
-        updateBadge(enabled);
+        updateBadge(modeType);
     }, 100);
 }
 
 // Update badge when storage changes
 chrome.storage.onChanged.addListener((changes, namespace) => {
-    if (namespace === 'sync' && changes.audioMode) {
-        debouncedUpdateBadge(changes.audioMode.newValue);
+    if (namespace === 'sync' && changes.audioModeType) {
+        debouncedUpdateBadge(changes.audioModeType.newValue);
     }
 });
 
-function updateBadge(enabled) {
-    if (enabled) {
+function updateBadge(modeType) {
+    if (modeType === 'always') {
         chrome.action.setBadgeText({ text: 'ON' });
         chrome.action.setBadgeBackgroundColor({ color: '#667eea' });
     } else {
-        chrome.action.setBadgeText({ text: '' });
+        // Filtered mode - show FLT with same purple as ON
+        chrome.action.setBadgeText({ text: 'FLT' });
+        chrome.action.setBadgeBackgroundColor({ color: '#667eea' });
     }
 }
 

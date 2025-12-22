@@ -13,7 +13,7 @@
         <div class="header">
             <div class="header-info">
                 <h1 data-i18n="appName">YouTube Audio Mode</h1>
-                <p class="subtitle" data-i18n="appDesc">Save bandwidth, keep the music</p>
+                <p class="subtitle" data-i18n="appDesc">Save bandwidth</p>
             </div>
             <div style="display: flex; gap: 8px;">
                 <button id="lang-btn" class="icon-btn" title="Language/لغة"
@@ -187,6 +187,18 @@
                         <div class="mode-text">
                             <span class="mode-name" data-i18n="modeFiltered">Filtered</span>
                             <span class="mode-desc" data-i18n="modeFilteredDesc">Based on your filter rules</span>
+                        </div>
+                    </button>
+                    <button class="mode-btn" data-mode="off" id="mode-off">
+                        <div class="mode-icon">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line>
+                            </svg>
+                        </div>
+                        <div class="mode-text">
+                            <span class="mode-name" data-i18n="modeOff">Off</span>
+                            <span class="mode-desc" data-i18n="modeOffDesc">Extension disabled</span>
                         </div>
                     </button>
                 </div>

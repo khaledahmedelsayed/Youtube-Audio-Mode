@@ -114,6 +114,7 @@ if (chrome.runtime?.id) {
  * Apply the current mode logic
  * - 'always': Enable audio mode on all YouTube videos
  * - 'filtered': Enable/disable based on filter rules, OFF if no match
+ * - 'off': Extension disabled, normal video playback
  */
 async function applyModeLogic() {
     // Only apply on video pages
@@ -125,7 +126,14 @@ async function applyModeLogic() {
         return;
     }
 
-    if (currentModeType === 'always') {
+    if (currentModeType === 'off') {
+        // Off mode: disable audio mode, use preferred quality
+        if (audioModeEnabled) {
+            disableAudioMode(true);
+        } else {
+            applyPreferredQuality();
+        }
+    } else if (currentModeType === 'always') {
         // Always On mode: enable audio mode on all videos
         if (!audioModeEnabled) {
             enableAudioMode(true); // fromAutoRule = true, don't persist
@@ -1266,16 +1274,38 @@ function setupVideoReadyListener() {
         console.log('[Audio Mode] Video loadeddata event');
         if (!isOnVideoPage()) return;
 
-        // Re-apply quality after video loads
-        if (audioModeEnabled) {
-            // Audio mode enabled - ensure 144p quality
-            setLowestQuality();
-        } else if (currentModeType === 'always' && isOnVideoPage()) {
-            // Always mode but not enabled yet - enable it
-            enableAudioMode(true);
+        // Check if video ID changed (important for playlists)
+        const currentVideoId = new URLSearchParams(window.location.search).get('v');
+        const videoIdChanged = currentVideoId && currentVideoId !== lastAppliedVideoId;
+
+        if (videoIdChanged) {
+            console.log('[Audio Mode] Video ID changed:', lastAppliedVideoId, '->', currentVideoId);
+            resetQualityAttemptFlag(); // Allow UI fallback on new video
+        }
+
+        // Re-apply mode logic after video loads
+        if (currentModeType === 'off') {
+            // Off mode - apply preferred quality
+            if (audioModeEnabled) {
+                disableAudioMode(true);
+            } else {
+                applyPreferredQuality();
+            }
         } else if (currentModeType === 'filtered') {
-            // Filtered mode - re-check filter rules
-            applyFilteredMode();
+            // Filtered mode - ALWAYS re-check filter rules on video change
+            // This handles playlist navigation where videos have different filter matches
+            if (videoIdChanged || !audioModeEnabled) {
+                applyFilteredMode();
+            } else {
+                setLowestQuality();
+            }
+        } else if (currentModeType === 'always') {
+            // Always mode - enable or re-apply quality
+            if (!audioModeEnabled) {
+                enableAudioMode(true);
+            } else {
+                setLowestQuality();
+            }
         }
     });
 }
@@ -1294,19 +1324,59 @@ document.addEventListener('yt-page-data-updated', () => {
     if (!isOnVideoPage()) return;
     console.log('[Audio Mode] yt-page-data-updated event fired');
 
-    // This event fires when YouTube has updated the page data
-    // Good time to re-check filter rules if needed
-    if (currentModeType === 'filtered' && !audioModeEnabled) {
-        // Only re-check if not already enabled (avoid unnecessary checks)
+    // Check if video ID changed (for playlist navigation)
+    const currentVideoId = new URLSearchParams(window.location.search).get('v');
+    const videoIdChanged = currentVideoId && currentVideoId !== lastAppliedVideoId;
+
+    if (videoIdChanged && currentModeType === 'filtered') {
+        // In filtered mode, always re-check when video changes
+        console.log('[Audio Mode] Video changed in playlist, re-checking filters');
+        setTimeout(() => applyFilteredMode(), 200);
+    } else if (currentModeType === 'filtered' && !audioModeEnabled) {
+        // Not enabled yet, check filters
         setTimeout(() => applyFilteredMode(), 200);
     }
 });
+
+// Playlist video change detection (fallback for when events don't fire)
+let lastCheckedVideoId = null;
+let playlistCheckInterval = null;
+
+function startPlaylistCheck() {
+    if (playlistCheckInterval) return;
+
+    playlistCheckInterval = setInterval(() => {
+        if (!isOnVideoPage()) return;
+
+        const currentVideoId = new URLSearchParams(window.location.search).get('v');
+        if (currentVideoId && currentVideoId !== lastCheckedVideoId) {
+            console.log('[Audio Mode] Playlist check detected video change:', lastCheckedVideoId, '->', currentVideoId);
+            lastCheckedVideoId = currentVideoId;
+
+            // If video ID differs from last applied, re-apply mode logic
+            if (currentVideoId !== lastAppliedVideoId) {
+                resetQualityAttemptFlag();
+                applyModeLogic();
+            }
+        }
+    }, 1500); // Check every 1.5 seconds
+}
+
+// Start playlist check when on YouTube
+if (isOnVideoPage()) {
+    lastCheckedVideoId = new URLSearchParams(window.location.search).get('v');
+}
+startPlaylistCheck();
 
 // Cleanup on extension unload
 window.addEventListener('beforeunload', () => {
     if (navigationObserver) {
         navigationObserver.disconnect();
         navigationObserver = null;
+    }
+    if (playlistCheckInterval) {
+        clearInterval(playlistCheckInterval);
+        playlistCheckInterval = null;
     }
     stopUsageTracking();
 });

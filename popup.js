@@ -2,10 +2,11 @@
 
 const modeAlwaysBtn = document.getElementById('mode-always');
 const modeFilteredBtn = document.getElementById('mode-filtered');
+const modeOffBtn = document.getElementById('mode-off');
 const configureFiltersBtn = document.getElementById('configure-filters-btn');
 const langBtn = document.getElementById('lang-btn');
 
-// Current audio mode type: 'always' or 'filtered'
+// Current audio mode type: 'always', 'filtered', or 'off'
 let currentModeType = 'always';
 
 // Current language and loaded messages
@@ -105,15 +106,22 @@ chrome.storage.sync.get(['audioModeType'], (result) => {
 
 // Update mode selector UI
 function updateModeUI(mode) {
-    // Update button states
+    // Remove active from all mode buttons
+    modeAlwaysBtn.classList.remove('active');
+    modeFilteredBtn.classList.remove('active');
+    modeOffBtn.classList.remove('active');
+
+    // Set active on selected mode and show/hide configure button
     if (mode === 'always') {
         modeAlwaysBtn.classList.add('active');
-        modeFilteredBtn.classList.remove('active');
         configureFiltersBtn.classList.add('hidden');
-    } else {
-        modeAlwaysBtn.classList.remove('active');
+    } else if (mode === 'filtered') {
         modeFilteredBtn.classList.add('active');
         configureFiltersBtn.classList.remove('hidden');
+    } else {
+        // 'off' mode
+        modeOffBtn.classList.add('active');
+        configureFiltersBtn.classList.add('hidden');
     }
 }
 
@@ -144,6 +152,7 @@ function selectMode(mode) {
 // Mode button click handlers
 modeAlwaysBtn.addEventListener('click', () => selectMode('always'));
 modeFilteredBtn.addEventListener('click', () => selectMode('filtered'));
+modeOffBtn.addEventListener('click', () => selectMode('off'));
 
 // Configure filters button opens the filter panel
 configureFiltersBtn.addEventListener('click', () => {

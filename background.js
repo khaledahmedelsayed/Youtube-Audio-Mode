@@ -38,10 +38,12 @@ function updateBadge(modeType) {
     if (modeType === 'always') {
         chrome.action.setBadgeText({ text: 'ON' });
         chrome.action.setBadgeBackgroundColor({ color: '#667eea' });
-    } else {
-        // Filtered mode - show FLT with same purple as ON
+    } else if (modeType === 'filtered') {
         chrome.action.setBadgeText({ text: 'FLT' });
         chrome.action.setBadgeBackgroundColor({ color: '#667eea' });
+    } else {
+        // Off mode - no badge
+        chrome.action.setBadgeText({ text: '' });
     }
 }
 

@@ -527,9 +527,11 @@ closeFilterBtn.addEventListener('click', () => {
     document.body.classList.remove('panel-open');
 });
 
-// Fetch current video info from content script
-async function fetchCurrentVideoInfo() {
+// Fetch current video info from content script with retry logic
+async function fetchCurrentVideoInfo(retryCount = 0) {
     const currentChannelName = document.getElementById('current-channel-name');
+    const MAX_RETRIES = 3;
+    const RETRY_DELAY = 800;
 
     try {
         const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -539,6 +541,11 @@ async function fetchCurrentVideoInfo() {
             currentChannelName.textContent = t('notOnVideo');
             quickAddChannelBtn.disabled = true;
             return;
+        }
+
+        // Show loading state on first attempt
+        if (retryCount === 0) {
+            currentChannelName.textContent = '...';
         }
 
         const response = await chrome.tabs.sendMessage(currentTab.id, { action: 'getVideoInfo' });
@@ -551,12 +558,22 @@ async function fetchCurrentVideoInfo() {
             // Check if already added
             updateQuickAddButtonState();
         } else {
-            currentChannelName.textContent = t('channelNotFound');
-            quickAddChannelBtn.disabled = true;
+            // Retry if channel not found yet (YouTube might still be loading)
+            if (retryCount < MAX_RETRIES) {
+                setTimeout(() => fetchCurrentVideoInfo(retryCount + 1), RETRY_DELAY);
+            } else {
+                currentChannelName.textContent = t('channelNotFound');
+                quickAddChannelBtn.disabled = true;
+            }
         }
     } catch (error) {
-        currentChannelName.textContent = t('notOnVideo');
-        quickAddChannelBtn.disabled = true;
+        // Retry on error (content script might not be ready)
+        if (retryCount < MAX_RETRIES) {
+            setTimeout(() => fetchCurrentVideoInfo(retryCount + 1), RETRY_DELAY);
+        } else {
+            currentChannelName.textContent = t('notOnVideo');
+            quickAddChannelBtn.disabled = true;
+        }
     }
 }
 

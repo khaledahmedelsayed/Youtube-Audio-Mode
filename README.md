@@ -6,7 +6,7 @@
 
 **Save bandwidth and enjoy distraction-free listening on YouTube.**
 
-YouTube Audio Mode is a lightweight Chrome extension that transforms your YouTube experience by playing videos in audio-only mode. It intelligently forces the video quality to 144p and hides the video player, replacing it with a beautiful audio visualizer. This drastically reduces internet data usage, making it perfect for music streaming, listening to podcasts, or saving bandwidth on metered connections.
+YouTube Audio Mode is a lightweight Chrome extension that transforms your YouTube experience by playing videos in audio-only mode. It intelligently forces the video quality to 144p and hides the video player, replacing it with a beautiful audio visualizer. This drastically reduces internet data usage, listening to podcasts, or saving bandwidth on metered connections.
 
 ## ✨ Key Features
 
@@ -21,12 +21,17 @@ YouTube Audio Mode is a lightweight Chrome extension that transforms your YouTub
 
 ## 🆕 New Features in This Fork
 
+### Three Operating Modes
+- **Always On:** Audio mode enabled on all YouTube videos (original behavior)
+- **Filtered:** Audio mode only for whitelisted channels/keywords
+- **Off:** Extension completely disabled, normal YouTube experience
+
 ### Filter Mode (Whitelist-based)
-- **Mode Selection:** Choose between "Always On" (original behavior) or "Filtered" mode
 - **Channel Whitelist:** Audio mode activates only for specific channels you add
 - **Keyword Filtering:** Match video titles against keywords (e.g., "podcast", "music")
 - **Quick-Add Button:** Instantly add the current channel to your whitelist from the popup
-- **Badge Indicator:** Shows "ON" for always mode or "FLT" for filtered mode
+- **Playlist Support:** Properly handles playlists with mixed content (some videos filtered, some not)
+- **Badge Indicator:** Shows "ON" for always mode, "FLT" for filtered mode, or no badge when off
 
 ### Quality Preference Management
 - **Preferred Quality Selector:** Choose your default video quality (720p, 1080p, 4K, etc.)
@@ -42,6 +47,10 @@ YouTube Audio Mode is a lightweight Chrome extension that transforms your YouTub
 - Fixed settings icon becoming unclickable after navigating between videos
 - Improved keyword filtering reliability during navigation
 - Better quality restoration when toggling audio mode off
+- Fixed 144p quality not being applied when navigating between filtered videos
+- Fixed playlist navigation not re-checking filter rules between videos
+- Improved video detection reliability on initial page load
+- Added retry logic for popup channel info fetching
 
 ## 🚀 Installation
 
@@ -61,9 +70,13 @@ _Link coming soon once the review process is complete!_
 
 1.  Open any YouTube video.
 2.  Click the **YouTube Audio Mode** icon in your browser toolbar.
-3.  Toggle the switch to **On**.
-4.  The video player will be hidden, and the visualizer will appear.
-5.  To customize the look, click the **Settings (Gear)** icon in the popup.
+3.  Select your preferred mode:
+    - **Always On:** Audio mode on all videos
+    - **Filtered:** Audio mode only for whitelisted channels/keywords
+    - **Off:** Disable the extension
+4.  For Filtered mode, click **Configure Filters** to add channels or keywords.
+5.  The video player will be hidden, and the visualizer will appear when audio mode is active.
+6.  To customize the look, click the **Settings (Gear)** icon in the popup.
 
 ## ⌨️ Shortcuts
 

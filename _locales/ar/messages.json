@@ -83,6 +83,14 @@
         "message": "حسب قواعد التصفية",
         "description": "Description for filtered mode"
     },
+    "modeOff": {
+        "message": "إيقاف",
+        "description": "Mode selector: extension disabled"
+    },
+    "modeOffDesc": {
+        "message": "الإضافة معطلة",
+        "description": "Description for off mode"
+    },
     "shortcut": {
         "message": "الاختصار (اضغط للتغيير):",
         "description": "Label for keyboard shortcut display"

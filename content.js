@@ -1,6 +1,12 @@
 // YouTube Audio Mode - Content Script
 // This script runs on YouTube pages and enables audio-only playback
 
+// ===== HELPER: Check if on video page =====
+function isOnVideoPage() {
+    return window.location.pathname === '/watch' &&
+           new URLSearchParams(window.location.search).has('v');
+}
+
 // ===== CONFIGURATION CONSTANTS =====
 const TIMING = {
     RETRY_DELAY: 1000,
@@ -110,6 +116,15 @@ if (chrome.runtime?.id) {
  * - 'filtered': Enable/disable based on filter rules, OFF if no match
  */
 async function applyModeLogic() {
+    // Only apply on video pages
+    if (!isOnVideoPage()) {
+        // If we navigated away from a video, disable audio mode
+        if (audioModeEnabled) {
+            disableAudioMode(true);
+        }
+        return;
+    }
+
     if (currentModeType === 'always') {
         // Always On mode: enable audio mode on all videos
         if (!audioModeEnabled) {
@@ -177,6 +192,7 @@ function applyPreferredQuality() {
  */
 async function applyFilteredMode(retryCount = 0) {
     if (!chrome.runtime?.id) return;
+    if (!isOnVideoPage()) return; // Safeguard
 
     const MAX_RETRIES = 5;
     const RETRY_DELAY = 600;
@@ -296,6 +312,17 @@ function getVideoElement() {
  */
 function clearVideoCache() {
     cachedVideoElement = null;
+}
+
+/**
+ * Reset quality attempt flag (needed when navigating to new video)
+ * This allows the UI fallback to work on the new video
+ */
+function resetQualityAttemptFlag() {
+    const player = document.getElementById('movie_player');
+    if (player) {
+        delete player.__audioModeQualityAttempted;
+    }
 }
 
 // ===== VIDEO INFO EXTRACTION (for whitelist/blacklist) =====
@@ -1172,6 +1199,7 @@ function initNavigationObserver() {
             lastUrl = url;
             clearVideoCache(); // Clear cached video element on navigation
             lastAppliedVideoId = null; // Reset for new video
+            resetQualityAttemptFlag(); // Allow UI fallback on new video
 
             // Debounce to avoid multiple rapid calls during SPA transition
             if (navigationDebounceTimer) {
@@ -1200,6 +1228,7 @@ document.addEventListener('yt-navigate-finish', () => {
     console.log('[Audio Mode] yt-navigate-finish event fired');
     clearVideoCache();
     lastAppliedVideoId = null;
+    resetQualityAttemptFlag(); // Allow UI fallback on new video
 
     // Small delay to ensure video player is ready
     setTimeout(() => {
@@ -1209,9 +1238,16 @@ document.addEventListener('yt-navigate-finish', () => {
 
 // Also listen for video element becoming ready
 // This handles cases where mode logic runs before video is fully loaded
-let videoReadyObserver = null;
+let currentVideoElement = null;
 
 function setupVideoReadyListener() {
+    // Only setup on video pages
+    if (!isOnVideoPage()) {
+        // Retry later in case we navigate to a video
+        setTimeout(setupVideoReadyListener, 1000);
+        return;
+    }
+
     const video = document.querySelector('video');
     if (!video) {
         // Retry if video not found yet
@@ -1219,25 +1255,52 @@ function setupVideoReadyListener() {
         return;
     }
 
+    // Avoid adding duplicate listeners
+    if (video === currentVideoElement) {
+        return;
+    }
+    currentVideoElement = video;
+
     // Listen for video source changes (new video loaded)
     video.addEventListener('loadeddata', () => {
         console.log('[Audio Mode] Video loadeddata event');
+        if (!isOnVideoPage()) return;
+
         // Re-apply quality after video loads
         if (audioModeEnabled) {
             // Audio mode enabled - ensure 144p quality
             setLowestQuality();
-        } else if (currentModeType === 'always') {
+        } else if (currentModeType === 'always' && isOnVideoPage()) {
             // Always mode but not enabled yet - enable it
             enableAudioMode(true);
-        } else {
-            // Filtered mode and not enabled - apply preferred quality
-            applyPreferredQuality();
+        } else if (currentModeType === 'filtered') {
+            // Filtered mode - re-check filter rules
+            applyFilteredMode();
         }
     });
 }
 
 // Initialize video listener
 setupVideoReadyListener();
+
+// Re-setup video listener on navigation (video element may be replaced)
+document.addEventListener('yt-navigate-finish', () => {
+    // Small delay to let YouTube create new video element
+    setTimeout(setupVideoReadyListener, 500);
+});
+
+// Listen for YouTube's page data update event (fires when video metadata is ready)
+document.addEventListener('yt-page-data-updated', () => {
+    if (!isOnVideoPage()) return;
+    console.log('[Audio Mode] yt-page-data-updated event fired');
+
+    // This event fires when YouTube has updated the page data
+    // Good time to re-check filter rules if needed
+    if (currentModeType === 'filtered' && !audioModeEnabled) {
+        // Only re-check if not already enabled (avoid unnecessary checks)
+        setTimeout(() => applyFilteredMode(), 200);
+    }
+});
 
 // Cleanup on extension unload
 window.addEventListener('beforeunload', () => {

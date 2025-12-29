@@ -54,11 +54,7 @@ YouTube Audio Mode is a lightweight Chrome extension that transforms your YouTub
 
 ## 🚀 Installation
 
-### Option 1: Chrome Web Store (Recommended)
-
-_Link coming soon once the review process is complete!_
-
-### Option 2: Manual Installation (Developer Mode)
+ Manual Installation (Developer Mode)
 
 1.  Clone or download this repository.
 2.  Open Chrome and go to `chrome://extensions/`.

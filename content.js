@@ -45,6 +45,11 @@ let lastAppliedVideoId = null;
 let currentModeType = 'always'; // 'always' or 'filtered'
 let savedQualityBeforeAudioMode = null; // Store user's quality to restore later
 
+// Quality operation locking state - prevents duplicate popup openings
+let qualityOperationInProgress = false;
+let qualityOperationTimeout = null;
+let lastQualityOperationType = null; // 'set' or 'restore'
+
 // Current language and loaded messages
 let loadedMessages = {};
 
@@ -149,15 +154,24 @@ async function applyModeLogic() {
 
 /**
  * Apply user's preferred quality to the current video
- * Used when audio mode is OFF (normal video playback)
+ * Uses the central quality operation handler to prevent duplicate popups
  */
 function applyPreferredQuality() {
+    requestQualityOperation('preferred');
+}
+
+/**
+ * Internal: Apply user's preferred quality to the current video
+ * Used when audio mode is OFF (normal video playback)
+ * @param {Function} onComplete - Callback when operation completes
+ */
+function applyPreferredQualityInternal(onComplete = null) {
     const player = document.getElementById('movie_player');
     const video = getVideoElement();
 
     if (!player || !video) {
         // Retry if player not ready
-        setTimeout(applyPreferredQuality, 500);
+        setTimeout(() => applyPreferredQualityInternal(onComplete), 500);
         return;
     }
 
@@ -165,30 +179,48 @@ function applyPreferredQuality() {
         const quality = result.preferredQuality;
         if (!quality || quality === 'auto') {
             // Auto or not set - let YouTube handle it
+            onComplete?.();
             return;
         }
+
+        // Map quality codes to UI text for click fallback
+        const qualityToText = {
+            'hd2160': '2160p',
+            'hd1440': '1440p',
+            'hd1080': '1080p',
+            'hd720': '720p',
+            'large': '480p',
+            'medium': '360p',
+            'small': '240p',
+            'tiny': '144p'
+        };
+        const uiTargetText = qualityToText[quality] || '720p';
 
         console.log('[Audio Mode] Applying preferred quality:', quality);
 
         try {
-            // Wait for video to be ready before setting quality
-            const setQuality = () => {
-                if (player.setPlaybackQualityRange) {
-                    player.setPlaybackQualityRange(quality, quality);
-                }
-                if (player.setPlaybackQuality) {
-                    player.setPlaybackQuality(quality);
-                }
-            };
-
-            // If video is ready, set immediately. Otherwise wait.
-            if (video.readyState >= 2) {
-                setQuality();
-            } else {
-                video.addEventListener('loadeddata', setQuality, { once: true });
+            // Try API methods first
+            if (player.setPlaybackQualityRange) {
+                player.setPlaybackQualityRange(quality, quality);
             }
+            if (player.setPlaybackQuality) {
+                player.setPlaybackQuality(quality);
+            }
+
+            // Verify after a moment and use UI fallback if needed
+            setTimeout(() => {
+                const currentQuality = player.getPlaybackQuality ? player.getPlaybackQuality() : 'unknown';
+
+                if (currentQuality !== quality) {
+                    console.log('[Audio Mode] API failed, using UI click for preferred quality');
+                    clickQualitySetting(video, uiTargetText, onComplete);
+                } else {
+                    onComplete?.();
+                }
+            }, 500);
         } catch (e) {
             console.log('[Audio Mode] Could not apply preferred quality:', e);
+            onComplete?.();
         }
     });
 }
@@ -331,6 +363,73 @@ function resetQualityAttemptFlag() {
     if (player) {
         delete player.__audioModeQualityAttempted;
     }
+}
+
+/**
+ * Central handler for quality operations with debouncing and mutual exclusion
+ * Prevents duplicate quality popup openings when multiple events trigger quality changes
+ * @param {string} type - 'set' (144p) or 'restore' (user preferred)
+ * @param {number} debounceMs - Debounce delay (default 300ms)
+ */
+function requestQualityOperation(type, debounceMs = 300) {
+    // Cancel any pending operation request
+    if (qualityOperationTimeout) {
+        clearTimeout(qualityOperationTimeout);
+        qualityOperationTimeout = null;
+    }
+
+    // If same type operation already in progress, skip
+    if (qualityOperationInProgress && lastQualityOperationType === type) {
+        console.log(`[Audio Mode] Quality operation '${type}' already in progress, skipping`);
+        return;
+    }
+
+    // Debounce to consolidate rapid triggers
+    qualityOperationTimeout = setTimeout(() => {
+        qualityOperationTimeout = null;
+        executeQualityOperation(type);
+    }, debounceMs);
+}
+
+/**
+ * Execute a quality operation with mutual exclusion
+ * @param {string} type - 'set', 'restore', or 'preferred'
+ */
+function executeQualityOperation(type) {
+    if (qualityOperationInProgress) {
+        console.log(`[Audio Mode] Quality operation in progress, queuing '${type}'`);
+        // Queue for after current operation completes
+        setTimeout(() => requestQualityOperation(type, 100), 500);
+        return;
+    }
+
+    qualityOperationInProgress = true;
+    lastQualityOperationType = type;
+
+    const cleanup = () => {
+        qualityOperationInProgress = false;
+        lastQualityOperationType = null;
+    };
+
+    if (type === 'set') {
+        setLowestQualityInternal(cleanup);
+    } else if (type === 'restore') {
+        restoreQualityInternal(cleanup);
+    } else if (type === 'preferred') {
+        applyPreferredQualityInternal(cleanup);
+    }
+}
+
+/**
+ * Cancel any pending quality operations
+ * Called during navigation to prevent stale operations
+ */
+function cancelPendingQualityOperations() {
+    if (qualityOperationTimeout) {
+        clearTimeout(qualityOperationTimeout);
+        qualityOperationTimeout = null;
+    }
+    // Don't reset qualityOperationInProgress here - let ongoing operations complete
 }
 
 // ===== VIDEO INFO EXTRACTION (for whitelist/blacklist) =====
@@ -670,8 +769,9 @@ function resetSettingsUIStyles() {
  * Function to interact with YouTube's quality settings UI (invisibly)
  * @param {HTMLVideoElement} video - The video element
  * @param {string} targetText - The text to look for (e.g. '144p', '720p', 'Auto')
+ * @param {Function} onComplete - Optional callback when operation completes
  */
-const clickQualitySetting = (video, targetText = '144p') => {
+const clickQualitySetting = (video, targetText = '144p', onComplete = null) => {
     // Increment operation ID to invalidate any pending callbacks
     const operationId = ++currentQualityOperationId;
 
@@ -703,6 +803,7 @@ const clickQualitySetting = (video, targetText = '144p') => {
                 // Check if this operation is still valid
                 if (operationId !== currentQualityOperationId) {
                     resetSettingsUIStyles();
+                    onComplete?.();
                     return;
                 }
 
@@ -717,6 +818,7 @@ const clickQualitySetting = (video, targetText = '144p') => {
                         // Check if this operation is still valid
                         if (operationId !== currentQualityOperationId) {
                             resetSettingsUIStyles();
+                            onComplete?.();
                             return;
                         }
 
@@ -746,6 +848,7 @@ const clickQualitySetting = (video, targetText = '144p') => {
                             // Check if this operation is still valid
                             if (operationId !== currentQualityOperationId) {
                                 resetSettingsUIStyles();
+                                onComplete?.();
                                 return;
                             }
 
@@ -769,18 +872,26 @@ const clickQualitySetting = (video, targetText = '144p') => {
                                     video.currentTime = currentTime;
                                     video.play().catch(err => console.log('[Audio Mode] Could not resume:', err));
                                 }
+
+                                // Signal completion
+                                onComplete?.();
                             }, 200);
                         }, 100);
                     }, 300);
                 } else {
                     // No quality menu found, cleanup
                     resetSettingsUIStyles();
+                    onComplete?.();
                 }
             }, 300);
+        } else {
+            // No settings button found
+            onComplete?.();
         }
     } catch (error) {
         console.error('[Audio Mode] Error in invisible UI interaction:', error);
         resetSettingsUIStyles();
+        onComplete?.();
     }
 };
 
@@ -788,8 +899,9 @@ const clickQualitySetting = (video, targetText = '144p') => {
  * Function to force set quality to 144p using multiple methods
  * @param {HTMLElement} player - The YouTube player element
  * @param {HTMLVideoElement} video - The video element
+ * @param {Function} onComplete - Optional callback when operation completes
  */
-const forceLowestQuality = (player, video) => {
+const forceLowestQuality = (player, video, onComplete = null) => {
     try {
         // Save the current playback state
         const wasPlaying = !video.paused;
@@ -804,7 +916,7 @@ const forceLowestQuality = (player, video) => {
 
         if (player.setPlaybackQualityRange) {
             // Clear any potential previous locks first?
-            // player.setPlaybackQualityRange('auto', 'auto'); 
+            // player.setPlaybackQualityRange('auto', 'auto');
             // Lock to tiny
             player.setPlaybackQualityRange('tiny', 'tiny');
         }
@@ -836,11 +948,16 @@ const forceLowestQuality = (player, video) => {
                 if (isFirstAttempt) {
                     console.log('[Audio Mode] API methods failed on first attempt, will try UI interaction...');
                     player.__audioModeQualityAttempted = true;
-                    // Use the generalized click function
-                    clickQualitySetting(video, '144p');
+                    // Use the generalized click function, pass onComplete callback
+                    clickQualitySetting(video, '144p', onComplete);
+                } else {
+                    // Not first attempt, skip UI interaction
+                    onComplete?.();
                 }
             } else {
                 player.__audioModeQualityAttempted = true;
+                // API methods succeeded, signal completion
+                onComplete?.();
             }
 
             // Restore playback state if it changed
@@ -851,22 +968,33 @@ const forceLowestQuality = (player, video) => {
 
     } catch (error) {
         console.error('[Audio Mode] Error setting quality:', error);
+        onComplete?.();
     }
 };
 
 /**
- * Restore quality to user's previous setting
+ * Restore quality to user's previous setting (public API)
+ * Uses the central quality operation handler to prevent duplicate popups
+ */
+function restoreQuality() {
+    requestQualityOperation('restore');
+}
+
+/**
+ * Internal: Restore quality to user's previous setting
  * Uses saved quality from session, falls back to stored preference, then 720p
- * Includes retry logic for reliability
+ * @param {Function} onComplete - Callback when operation completes
  * @param {number} attempts - Number of retry attempts remaining
  */
-const restoreQuality = (attempts = 3) => {
+const restoreQualityInternal = (onComplete = null, attempts = 3) => {
     const player = document.getElementById('movie_player');
     const video = getVideoElement();
 
     if (!player || !video) {
         if (attempts > 0) {
-            setTimeout(() => restoreQuality(attempts - 1), 100);
+            setTimeout(() => restoreQualityInternal(onComplete, attempts - 1), 100);
+        } else {
+            onComplete?.();
         }
         return;
     }
@@ -936,27 +1064,23 @@ const restoreQuality = (attempts = 3) => {
                 player.setPreferredQuality(target);
             }
 
-            // VERIFY and FALLBACK/RETRY
+            // VERIFY and FALLBACK
             setTimeout(() => {
                 const currentQuality = player.getPlaybackQuality ? player.getPlaybackQuality() : 'unknown';
 
-                // If not successful yet...
+                // If not successful yet, try UI click once
                 if (target !== 'auto' && currentQuality !== target) {
-                    if (attempts > 0) {
-                        // Try UI click as part of retry if API failed
-                        clickQualitySetting(video, uiTargetText);
-
-                        // Schedule next retry
-                        setTimeout(() => restoreQuality(attempts - 1), 800);
-                    }
+                    // Use UI click with onComplete callback
+                    clickQualitySetting(video, uiTargetText, onComplete);
+                } else {
+                    // API methods succeeded
+                    onComplete?.();
                 }
             }, 500);
 
         } catch (e) {
             console.error('[Audio Mode] Error restoring quality:', e);
-            if (attempts > 0) {
-                setTimeout(() => restoreQuality(attempts - 1), 1000);
-            }
+            onComplete?.();
         }
     });
 };
@@ -1030,6 +1154,9 @@ function stopUsageTracking() {
  * Separated from main tracking for better organization
  */
 function checkAndEnforceQuality() {
+    // Skip if a quality operation is already in progress to avoid duplicate popup
+    if (qualityOperationInProgress) return;
+
     const player = document.getElementById('movie_player');
     if (!player || !audioModeEnabled) return;
 
@@ -1040,29 +1167,29 @@ function checkAndEnforceQuality() {
     }
 }
 
+/**
+ * Set quality to 144p (public API)
+ * Uses the central quality operation handler to prevent duplicate popups
+ */
 function setLowestQuality() {
+    requestQualityOperation('set');
+}
+
+/**
+ * Internal: Set quality to 144p
+ * @param {Function} onComplete - Callback when operation completes
+ */
+function setLowestQualityInternal(onComplete = null) {
     const player = document.getElementById('movie_player');
     const video = getVideoElement();
 
     if (!player || !video) {
-        setTimeout(setLowestQuality, 1000);
+        setTimeout(() => setLowestQualityInternal(onComplete), 1000);
         return;
     }
 
-    // Use the global function
-    forceLowestQuality(player, video);
-
-    // Fallback: Also try the UI click directly if it's the very first time and video is playing
-    // (This is an extra safety layer for the "Manual" case the user reported)
-    if (!player.__audioModeQualityAttempted && !video.paused) {
-        setTimeout(() => {
-            const q = player.getPlaybackQuality ? player.getPlaybackQuality() : '';
-            if (q !== 'tiny' && q !== 'small') {
-                clickQualitySetting(video, '144p');
-                player.__audioModeQualityAttempted = true;
-            }
-        }, 800);
-    }
+    // Use the global function with completion callback
+    forceLowestQuality(player, video, onComplete);
 }
 
 async function createAudioModeOverlay() {
@@ -1208,6 +1335,7 @@ function initNavigationObserver() {
             clearVideoCache(); // Clear cached video element on navigation
             lastAppliedVideoId = null; // Reset for new video
             resetQualityAttemptFlag(); // Allow UI fallback on new video
+            cancelPendingQualityOperations(); // Cancel any pending quality popup operations
 
             // Debounce to avoid multiple rapid calls during SPA transition
             if (navigationDebounceTimer) {

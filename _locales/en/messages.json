@@ -135,10 +135,6 @@
     "message": "Audio Mode",
     "description": "Quality row label for audio mode (144p)"
   },
-  "developedBy": {
-    "message": "Developed by Ahmed Adli",
-    "description": "Footer developer credit"
-  },
   "onlyYoutube": {
     "message": "Only works on YouTube videos",
     "description": "Message shown when not on YouTube"

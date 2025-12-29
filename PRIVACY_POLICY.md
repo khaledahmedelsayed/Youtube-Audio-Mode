@@ -65,8 +65,8 @@ We may update this privacy policy from time to time. Any updates will be posted 
 
 For privacy concerns or questions:
 
-- **Email:** devahmedadli@gmail.com
-- **GitHub:** https://github.com/devahmedadli
+- **Email:** khaled.khaledahmed@gmail.com
+- **GitHub:** github.com/khaledahmedelsayed
 
 ## Your Rights
 

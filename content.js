@@ -612,6 +612,10 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
 async function enableAudioMode(fromAutoRule = false) {
     audioModeEnabled = true;
 
+    // Reset quality attempt flag to allow fresh UI fallback attempt
+    // This is important when enabling audio mode after adding a channel to whitelist
+    resetQualityAttemptFlag();
+
     // Find the video player
     const video = getVideoElement();
     if (!video) {

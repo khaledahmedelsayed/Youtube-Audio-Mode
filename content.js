@@ -176,7 +176,7 @@ function applyPreferredQualityInternal(onComplete = null) {
     }
 
     chrome.storage.sync.get(['preferredQuality'], (result) => {
-        const quality = result.preferredQuality;
+        let quality = result.preferredQuality;
         if (!quality || quality === 'auto') {
             // Auto or not set - let YouTube handle it
             onComplete?.();
@@ -194,7 +194,23 @@ function applyPreferredQualityInternal(onComplete = null) {
             'small': '240p',
             'tiny': '144p'
         };
-        const uiTargetText = qualityToText[quality] || '720p';
+        let uiTargetText = qualityToText[quality] || '720p';
+
+        // Check if preferred quality is available, fall back to next best if not
+        const availableLevels = player.getAvailableQualityLevels ? player.getAvailableQualityLevels() : [];
+        if (availableLevels.length > 0 && !availableLevels.includes(quality)) {
+            // Quality hierarchy to find next best available
+            const qualityOrder = ['hd2160', 'hd1440', 'hd1080', 'hd720', 'large', 'medium', 'small', 'tiny'];
+            const preferredIndex = qualityOrder.indexOf(quality);
+
+            // Find next available quality at or below preferred
+            let fallback = availableLevels.find(q => qualityOrder.indexOf(q) >= preferredIndex);
+            if (!fallback) fallback = 'auto';
+
+            console.log('[Audio Mode] Preferred quality', quality, 'not available, using:', fallback);
+            quality = fallback;
+            uiTargetText = qualityToText[quality] || 'Auto';
+        }
 
         console.log('[Audio Mode] Applying preferred quality:', quality);
 

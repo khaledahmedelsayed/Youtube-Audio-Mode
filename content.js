@@ -44,6 +44,10 @@ let videoPauseHandler = null;
 let lastAppliedVideoId = null;
 let currentModeType = 'always'; // 'always' or 'filtered'
 let savedQualityBeforeAudioMode = null; // Store user's quality to restore later
+let modeApplyTimeout = null;
+let modeApplyGeneration = 0;
+let modeApplyInProgress = false;
+let modeApplyQueued = false;
 
 // Quality operation locking state - prevents duplicate popup openings
 let qualityOperationInProgress = false;
@@ -106,7 +110,7 @@ if (chrome.runtime?.id) {
             currentModeType = result.audioModeType || 'always';
 
             // Apply mode logic
-            await applyModeLogic();
+            scheduleModeLogic('initial state', 0);
         });
     } catch (error) {
         console.log('[Audio Mode] Error during initialization:', error);
@@ -121,7 +125,43 @@ if (chrome.runtime?.id) {
  * - 'filtered': Enable/disable based on filter rules, OFF if no match
  * - 'off': Extension disabled, normal video playback
  */
-async function applyModeLogic() {
+function scheduleModeLogic(reason = 'unknown', delay = 250) {
+    modeApplyGeneration++;
+    const generation = modeApplyGeneration;
+
+    if (modeApplyTimeout) {
+        clearTimeout(modeApplyTimeout);
+    }
+
+    modeApplyTimeout = setTimeout(() => {
+        modeApplyTimeout = null;
+        runModeLogic(generation, reason);
+    }, delay);
+}
+
+async function runModeLogic(generation = ++modeApplyGeneration, reason = 'direct') {
+    if (modeApplyInProgress) {
+        modeApplyQueued = true;
+        console.log(`[Audio Mode] Mode logic already running, queued '${reason}'`);
+        return;
+    }
+
+    modeApplyInProgress = true;
+
+    try {
+        console.log(`[Audio Mode] Applying mode logic: ${reason}`);
+        await applyModeLogic(generation);
+    } finally {
+        modeApplyInProgress = false;
+
+        if (modeApplyQueued) {
+            modeApplyQueued = false;
+            scheduleModeLogic('queued mode update', 100);
+        }
+    }
+}
+
+async function applyModeLogic(generation = modeApplyGeneration) {
     // Only apply on video pages
     if (!isOnVideoPage()) {
         // If we navigated away from a video, disable audio mode
@@ -148,7 +188,7 @@ async function applyModeLogic() {
         }
     } else {
         // Filtered mode: check filter rules
-        await applyFilteredMode();
+        await applyFilteredMode(0, generation);
     }
 }
 
@@ -246,9 +286,10 @@ function applyPreferredQualityInternal(onComplete = null) {
  * If channel/keyword matches whitelist → enable audio mode
  * Otherwise → normal video (no audio mode)
  */
-async function applyFilteredMode(retryCount = 0) {
+async function applyFilteredMode(retryCount = 0, generation = modeApplyGeneration) {
     if (!chrome.runtime?.id) return;
     if (!isOnVideoPage()) return; // Safeguard
+    if (generation !== modeApplyGeneration) return;
 
     const MAX_RETRIES = 5;
     const RETRY_DELAY = 600;
@@ -262,6 +303,7 @@ async function applyFilteredMode(retryCount = 0) {
         // First attempt needs longer delay for YouTube to update DOM
         const initialDelay = retryCount === 0 ? 500 : 400;
         await new Promise(resolve => setTimeout(resolve, initialDelay));
+        if (generation !== modeApplyGeneration) return;
 
         const videoInfo = getCurrentVideoInfo();
         console.log('[Audio Mode] Video info:', videoInfo, 'Retry:', retryCount);
@@ -271,7 +313,11 @@ async function applyFilteredMode(retryCount = 0) {
         if (!videoInfo || !videoInfo.channelId || !videoInfo.videoTitle) {
             if (retryCount < MAX_RETRIES) {
                 console.log('[Audio Mode] No video info yet, retrying...');
-                setTimeout(() => applyFilteredMode(retryCount + 1), RETRY_DELAY);
+                setTimeout(() => {
+                    if (generation === modeApplyGeneration) {
+                        applyFilteredMode(retryCount + 1, generation);
+                    }
+                }, RETRY_DELAY);
                 return;
             }
 
@@ -587,10 +633,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         // Mode was changed in popup
         currentModeType = request.mode;
         lastAppliedVideoId = null; // Force re-evaluation
-        applyModeLogic().then(() => {
-            sendResponse({ success: true });
-        });
-        return true; // Keep channel open for async
+        scheduleModeLogic('popup mode change', 50);
+        sendResponse({ success: true });
     } else if (request.action === 'getStatus') {
         sendResponse({ enabled: audioModeEnabled, mode: currentModeType });
     } else if (request.action === 'updateTheme') {
@@ -612,15 +656,23 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 // Listen for storage changes to re-apply mode logic
 chrome.storage.onChanged.addListener((changes, namespace) => {
     if (namespace === 'sync') {
+        let scheduledModeUpdate = false;
+
         if (changes.audioModeType) {
             // Mode type changed
-            currentModeType = changes.audioModeType.newValue || 'always';
-            lastAppliedVideoId = null;
-            applyModeLogic();
-        } else if (changes.filterRules && currentModeType === 'filtered') {
+            const newModeType = changes.audioModeType.newValue || 'always';
+            if (newModeType !== currentModeType) {
+                currentModeType = newModeType;
+                lastAppliedVideoId = null;
+                scheduleModeLogic('storage mode change', 100);
+                scheduledModeUpdate = true;
+            }
+        }
+
+        if (!scheduledModeUpdate && changes.filterRules && currentModeType === 'filtered') {
             // Filter rules changed while in filtered mode
             lastAppliedVideoId = null;
-            applyFilteredMode();
+            scheduleModeLogic('filter rules change', 100);
         }
     }
 });
@@ -1365,7 +1417,7 @@ function initNavigationObserver() {
             // Wait for YouTube to update DOM before applying mode logic
             navigationDebounceTimer = setTimeout(() => {
                 console.log('[Audio Mode] Navigation detected, re-applying mode logic');
-                applyModeLogic();
+                scheduleModeLogic('url mutation', 100);
             }, 600); // Wait 600ms for YouTube to update DOM
         }
     });
@@ -1388,7 +1440,7 @@ document.addEventListener('yt-navigate-finish', () => {
 
     // Small delay to ensure video player is ready
     setTimeout(() => {
-        applyModeLogic();
+        scheduleModeLogic('yt-navigate-finish', 100);
     }, 300);
 });
 
@@ -1431,30 +1483,7 @@ function setupVideoReadyListener() {
             resetQualityAttemptFlag(); // Allow UI fallback on new video
         }
 
-        // Re-apply mode logic after video loads
-        if (currentModeType === 'off') {
-            // Off mode - apply preferred quality
-            if (audioModeEnabled) {
-                disableAudioMode(true);
-            } else {
-                applyPreferredQuality();
-            }
-        } else if (currentModeType === 'filtered') {
-            // Filtered mode - ALWAYS re-check filter rules on video change
-            // This handles playlist navigation where videos have different filter matches
-            if (videoIdChanged || !audioModeEnabled) {
-                applyFilteredMode();
-            } else {
-                setLowestQuality();
-            }
-        } else if (currentModeType === 'always') {
-            // Always mode - enable or re-apply quality
-            if (!audioModeEnabled) {
-                enableAudioMode(true);
-            } else {
-                setLowestQuality();
-            }
-        }
+        scheduleModeLogic('video loadeddata', videoIdChanged ? 50 : 200);
     });
 }
 
@@ -1479,10 +1508,10 @@ document.addEventListener('yt-page-data-updated', () => {
     if (videoIdChanged && currentModeType === 'filtered') {
         // In filtered mode, always re-check when video changes
         console.log('[Audio Mode] Video changed in playlist, re-checking filters');
-        setTimeout(() => applyFilteredMode(), 200);
+        scheduleModeLogic('page data video change', 200);
     } else if (currentModeType === 'filtered' && !audioModeEnabled) {
         // Not enabled yet, check filters
-        setTimeout(() => applyFilteredMode(), 200);
+        scheduleModeLogic('page data filters ready', 200);
     }
 });
 
@@ -1504,7 +1533,7 @@ function startPlaylistCheck() {
             // If video ID differs from last applied, re-apply mode logic
             if (currentVideoId !== lastAppliedVideoId) {
                 resetQualityAttemptFlag();
-                applyModeLogic();
+                scheduleModeLogic('playlist poll video change', 150);
             }
         }
     }, 1500); // Check every 1.5 seconds

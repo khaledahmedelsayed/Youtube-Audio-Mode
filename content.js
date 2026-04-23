@@ -373,8 +373,11 @@ function checkWhitelist(videoInfo, filterRules) {
     if (!whitelist) return false;
 
     // Check channel whitelist
-    if (channelId && whitelist.channels?.length > 0) {
-        const match = whitelist.channels.find(c => c.id === channelId);
+    if (whitelist.channels?.length > 0) {
+        const videoChannels = getVideoChannels(videoInfo);
+        const match = whitelist.channels.find(ruleChannel =>
+            videoChannels.some(videoChannel => videoChannel.id === ruleChannel.id)
+        );
         if (match) {
             console.log(`[Audio Mode] Channel match: ${match.name}`);
             return true;
@@ -397,6 +400,17 @@ function checkWhitelist(videoInfo, filterRules) {
 }
 
 // ===== HELPER FUNCTIONS =====
+
+function getVideoChannels(videoInfo) {
+    if (!videoInfo) return [];
+
+    const channels = Array.isArray(videoInfo.channels) ? videoInfo.channels : [];
+    const primaryChannel = videoInfo.channelId
+        ? [{ id: videoInfo.channelId, name: videoInfo.channelName }]
+        : [];
+
+    return dedupeChannels([...channels, ...primaryChannel]);
+}
 
 /**
  * Get cached video element or query for it
@@ -504,41 +518,18 @@ function cancelPendingQualityOperations() {
 function extractChannelInfo() {
     try {
         // Method 1: DOM-based extraction (most reliable for SPA navigation)
-        // Try multiple selectors for channel link
-        const channelSelectors = [
-            '#owner ytd-channel-name a',
-            'ytd-video-owner-renderer ytd-channel-name a',
-            '#channel-name a',
-            'ytd-channel-name a'
-        ];
-
-        for (const selector of channelSelectors) {
-            const channelLink = document.querySelector(selector);
-            if (channelLink) {
-                const href = channelLink.getAttribute('href');
-                const channelName = channelLink.textContent?.trim();
-
-                // Extract channel ID from href
-                let channelId = null;
-                if (href) {
-                    // Match /channel/UCxxxxxx pattern
-                    const channelIdMatch = href.match(/\/channel\/(UC[a-zA-Z0-9_-]+)/);
-                    if (channelIdMatch) {
-                        channelId = channelIdMatch[1];
-                    } else {
-                        // Match /@username pattern - use the href as identifier
-                        const handleMatch = href.match(/\/@([^\/\?]+)/);
-                        if (handleMatch) {
-                            channelId = `@${handleMatch[1]}`;
-                        }
-                    }
-                }
-
-                if (channelId && channelName) {
-                    console.log(`[Audio Mode] Channel found: ${channelName} (${channelId})`);
-                    return { channelId, channelName };
-                }
+        const channels = extractPageChannels();
+        if (channels.length > 0) {
+            const primaryChannel = channels[0];
+            console.log(`[Audio Mode] Channel found: ${primaryChannel.name} (${primaryChannel.id})`);
+            if (channels.length > 1) {
+                console.log('[Audio Mode] Additional channels found:', channels.slice(1));
             }
+            return {
+                channelId: primaryChannel.id,
+                channelName: primaryChannel.name,
+                channels
+            };
         }
 
         // Method 2: Try ytInitialPlayerResponse (embedded in page)
@@ -553,7 +544,11 @@ function extractChannelInfo() {
                         const channelId = data?.videoDetails?.channelId;
                         const channelName = data?.videoDetails?.author;
                         if (channelId && channelName) {
-                            return { channelId, channelName };
+                            return {
+                                channelId,
+                                channelName,
+                                channels: [{ id: channelId, name: channelName }]
+                            };
                         }
                     } catch (e) {
                         // JSON parse failed, continue
@@ -567,6 +562,60 @@ function extractChannelInfo() {
         console.error('[Audio Mode] Error extracting channel info:', error);
         return null;
     }
+}
+
+function parseChannelLink(channelLink) {
+    const href = channelLink?.getAttribute('href');
+    const channelName = channelLink?.textContent?.trim();
+    if (!href || !channelName) return null;
+
+    let channelId = null;
+    const channelIdMatch = href.match(/\/channel\/(UC[a-zA-Z0-9_-]+)/);
+    if (channelIdMatch) {
+        channelId = channelIdMatch[1];
+    } else {
+        const handleMatch = href.match(/\/@([^\/\?]+)/);
+        if (handleMatch) {
+            channelId = `@${handleMatch[1]}`;
+        }
+    }
+
+    if (!channelId) return null;
+    return { id: channelId, name: channelName };
+}
+
+function dedupeChannels(channels) {
+    const seen = new Set();
+    return channels.filter(channel => {
+        if (!channel?.id || seen.has(channel.id)) return false;
+        seen.add(channel.id);
+        return true;
+    });
+}
+
+function extractPageChannels() {
+    const scopedSelectors = [
+        '#owner ytd-channel-name a',
+        'ytd-video-owner-renderer ytd-channel-name a',
+        '#upload-info ytd-channel-name a',
+        '#owner a[href^="/channel/"]',
+        '#owner a[href^="/@"]',
+        'ytd-watch-metadata #owner a[href^="/channel/"]',
+        'ytd-watch-metadata #owner a[href^="/@"]',
+        'ytd-watch-metadata #upload-info a[href^="/channel/"]',
+        'ytd-watch-metadata #upload-info a[href^="/@"]',
+        'ytd-watch-metadata #byline-container a[href^="/channel/"]',
+        'ytd-watch-metadata #byline-container a[href^="/@"]',
+        'ytd-watch-metadata ytd-channel-name a'
+    ];
+
+    const channels = scopedSelectors.flatMap(selector =>
+        Array.from(document.querySelectorAll(selector))
+            .map(parseChannelLink)
+            .filter(Boolean)
+    );
+
+    return dedupeChannels(channels);
 }
 
 /**
@@ -613,12 +662,14 @@ function getCurrentVideoInfo() {
 
         // Get channel info
         const channelInfo = extractChannelInfo();
+        const channels = getVideoChannels(channelInfo);
 
         return {
             videoId,
             videoTitle,
             channelId: channelInfo?.channelId || null,
-            channelName: channelInfo?.channelName || null
+            channelName: channelInfo?.channelName || null,
+            channels
         };
     } catch (error) {
         console.error('[Audio Mode] Error extracting video info:', error);

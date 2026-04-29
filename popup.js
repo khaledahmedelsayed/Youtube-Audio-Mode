@@ -5,6 +5,7 @@ const modeFilteredBtn = document.getElementById('mode-filtered');
 const modeOffBtn = document.getElementById('mode-off');
 const configureFiltersBtn = document.getElementById('configure-filters-btn');
 const langBtn = document.getElementById('lang-btn');
+const settingsBtn = document.getElementById('settings-btn');
 
 // Current audio mode type: 'always', 'filtered', or 'off'
 let currentModeType = 'always';
@@ -58,12 +59,6 @@ async function setLanguage(lang) {
             el.textContent = translation;
         }
     });
-
-    // Update placeholders
-    const urlInput = document.getElementById('custom-image-url');
-    if (urlInput) {
-        urlInput.placeholder = 'https://example.com/image.jpg';
-    }
 
     // Refresh stats to apply new units
     updateStats();
@@ -156,10 +151,7 @@ modeOffBtn.addEventListener('click', () => selectMode('off'));
 
 // Configure filters button opens the filter panel
 configureFiltersBtn.addEventListener('click', () => {
-    filterPanel.classList.add('open');
-    document.body.classList.add('panel-open');
-    loadFilterRules();
-    fetchCurrentVideoInfo();
+    openSettingsPanel();
 });
 
 // Stats Update Logic
@@ -356,124 +348,48 @@ function updateShortcutDisplay() {
 // Initial call
 updateShortcutDisplay();
 
-// --- Settings Panel Logic ---
-
-const settingsBtn = document.getElementById('settings-btn');
-const settingsPanel = document.getElementById('settings-panel');
-const closeSettingsBtn = document.getElementById('close-settings');
-const colorOptions = document.getElementById('color-options');
-const imageOptions = document.getElementById('image-options');
-const toggleBtns = document.querySelectorAll('.toggle-btn');
-const themeBtns = document.querySelectorAll('.theme-btn');
-const colorPicker = document.getElementById('custom-color-picker');
-const colorValueText = document.getElementById('color-value-text');
-const imageUrlInput = document.getElementById('custom-image-url');
-const applyImageBtn = document.getElementById('apply-image-btn');
-
-// Toggle Settings Panel
-settingsBtn.addEventListener('click', () => {
-    settingsPanel.classList.add('open');
-    document.body.classList.add('panel-open');
-});
-
-closeSettingsBtn.addEventListener('click', () => {
-    settingsPanel.classList.remove('open');
-    document.body.classList.remove('panel-open');
-});
-
-// Load Saved Settings
-chrome.storage.sync.get(['backgroundType', 'backgroundValue'], (result) => {
-    const type = result.backgroundType || 'color';
-    const value = result.backgroundValue || 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
-
-    // Set Type Toggle
-    toggleBtns.forEach(btn => {
-        if (btn.dataset.type === type) {
-            btn.classList.add('active');
-        } else {
-            btn.classList.remove('active');
-        }
-    });
-
-    // Show correct section
-    if (type === 'image') {
-        colorOptions.classList.add('hidden');
-        imageOptions.classList.remove('hidden');
-        imageUrlInput.value = value;
-    } else {
-        colorOptions.classList.remove('hidden');
-        imageOptions.classList.add('hidden');
-
-        // Try to match preset
-        // If value starts with #, it might be custom color
-        if (value.startsWith('#')) {
-            colorPicker.value = value;
-            colorValueText.textContent = value;
-        }
-    }
-});
-
-// Handle Type Toggle
-toggleBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-        // Remove active from all
-        toggleBtns.forEach(b => b.classList.remove('active'));
-        // Add to clicked
-        btn.classList.add('active');
-
-        const type = btn.dataset.type;
-        if (type === 'color') {
-            colorOptions.classList.remove('hidden');
-            imageOptions.classList.add('hidden');
-            // Re-apply current color/preset
-            saveAndApplyTheme('color', getCurrentColorValue());
-        } else {
-            colorOptions.classList.add('hidden');
-            imageOptions.classList.remove('hidden');
-            // Re-apply current image
-            saveAndApplyTheme('image', imageUrlInput.value);
-        }
-    });
-});
-
-// Handle Presets
-themeBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-        // Remove active class from all
-        themeBtns.forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-
-        const bg = btn.style.background;
-        saveAndApplyTheme('color', bg);
-    });
-});
-
-// Handle Color Picker
-colorPicker.addEventListener('input', (e) => {
-    const color = e.target.value;
-    colorValueText.textContent = color;
-    // Remove active from presets
-    themeBtns.forEach(b => b.classList.remove('active'));
-
-    saveAndApplyTheme('color', color);
-});
-
-// Handle Image Apply
-applyImageBtn.addEventListener('click', () => {
-    const url = imageUrlInput.value.trim();
-    if (url) {
-        saveAndApplyTheme('image', url);
-        // Visual feedback
-        const originalText = applyImageBtn.textContent;
-        applyImageBtn.textContent = t('applied');
-        setTimeout(() => {
-            applyImageBtn.textContent = originalText;
-        }, 1500);
-    }
-});
-
 // --- Quality Selector Logic ---
+const audioBgColorPicker = document.getElementById('audio-bg-color-picker');
+const audioBgColorValue = document.getElementById('audio-bg-color-value');
 const qualitySelect = document.getElementById('quality-select');
+
+chrome.storage.sync.get(['backgroundType', 'backgroundValue'], (result) => {
+    if (!audioBgColorPicker || !audioBgColorValue) return;
+
+    const value = result.backgroundType === 'color' && result.backgroundValue?.startsWith('#')
+        ? result.backgroundValue
+        : '#667eea';
+
+    audioBgColorPicker.value = value;
+    audioBgColorValue.textContent = value;
+});
+
+if (audioBgColorPicker) {
+    audioBgColorPicker.addEventListener('input', (e) => {
+        const color = e.target.value;
+        if (audioBgColorValue) {
+            audioBgColorValue.textContent = color;
+        }
+
+        chrome.storage.sync.set({
+            backgroundType: 'color',
+            backgroundValue: color
+        });
+
+        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+            const currentTab = tabs[0];
+            if (currentTab?.url?.includes('youtube.com')) {
+                chrome.tabs.sendMessage(currentTab.id, {
+                    action: 'updateTheme',
+                    backgroundType: 'color',
+                    backgroundValue: color
+                }).catch(() => {
+                    // Ignore errors if content script is not ready
+                });
+            }
+        });
+    });
+}
 
 // Load saved quality preference
 chrome.storage.sync.get(['preferredQuality'], (result) => {
@@ -483,41 +399,10 @@ chrome.storage.sync.get(['preferredQuality'], (result) => {
 });
 
 // Save quality preference on change
-qualitySelect.addEventListener('change', () => {
-    const quality = qualitySelect.value;
-    chrome.storage.sync.set({ preferredQuality: quality });
-});
-
-function getCurrentColorValue() {
-    // Check if a preset is active
-    const activePreset = document.querySelector('.theme-btn.active');
-    if (activePreset) {
-        return activePreset.style.background;
-    }
-    // Otherwise return picker value
-    return colorPicker.value;
-}
-
-function saveAndApplyTheme(type, value) {
-    if (!value) return; // Don't save empty values
-
-    // Save to storage
-    chrome.storage.sync.set({
-        backgroundType: type,
-        backgroundValue: value
-    });
-
-    // Send to active tab
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        if (tabs[0] && tabs[0].url.includes('youtube.com')) {
-            chrome.tabs.sendMessage(tabs[0].id, {
-                action: 'updateTheme',
-                backgroundType: type,
-                backgroundValue: value
-            }).catch(() => {
-                // Ignore errors if content script is not ready
-            });
-        }
+if (qualitySelect) {
+    qualitySelect.addEventListener('change', () => {
+        const quality = qualitySelect.value;
+        chrome.storage.sync.set({ preferredQuality: quality });
     });
 }
 
@@ -530,6 +415,33 @@ const newRuleInput = document.getElementById('new-rule-input');
 const addRuleBtn = document.getElementById('add-rule-btn');
 
 let currentVideoInfo = null;
+
+function openSettingsPanel() {
+    filterPanel.classList.add('open');
+    document.body.classList.add('panel-open');
+    loadFilterRules();
+    fetchCurrentVideoInfo();
+}
+
+settingsBtn.addEventListener('click', () => {
+    openSettingsPanel();
+});
+
+function getCurrentVideoChannels() {
+    if (!currentVideoInfo) return [];
+
+    const channels = Array.isArray(currentVideoInfo.channels) ? currentVideoInfo.channels : [];
+    const primaryChannel = currentVideoInfo.channelId
+        ? [{ id: currentVideoInfo.channelId, name: currentVideoInfo.channelName }]
+        : [];
+    const seen = new Set();
+
+    return [...channels, ...primaryChannel].filter(channel => {
+        if (!channel?.id || seen.has(channel.id)) return false;
+        seen.add(channel.id);
+        return true;
+    });
+}
 
 closeFilterBtn.addEventListener('click', () => {
     filterPanel.classList.remove('open');
@@ -561,7 +473,8 @@ async function fetchCurrentVideoInfo(retryCount = 0) {
 
         if (response?.channelName) {
             currentVideoInfo = response;
-            currentChannelName.textContent = response.channelName;
+            const channels = getCurrentVideoChannels();
+            currentChannelName.textContent = channels.map(channel => channel.name).join(', ') || response.channelName;
             quickAddChannelBtn.disabled = false;
 
             // Check if already added
@@ -588,17 +501,21 @@ async function fetchCurrentVideoInfo(retryCount = 0) {
 
 // Update quick add button state based on current rules
 async function updateQuickAddButtonState() {
-    if (!currentVideoInfo?.channelId) return;
+    const currentChannels = getCurrentVideoChannels();
+    if (currentChannels.length === 0) return;
 
     const result = await chrome.storage.sync.get(['filterRules']);
     const rules = result.filterRules || { whitelist: { channels: [], keywords: [] } };
 
-    const inWhitelist = rules.whitelist?.channels?.some(c => c.id === currentVideoInfo.channelId) || false;
+    const savedChannels = rules.whitelist?.channels || [];
+    const allInWhitelist = currentChannels.every(channel =>
+        savedChannels.some(savedChannel => savedChannel.id === channel.id)
+    );
 
-    quickAddChannelBtn.classList.toggle('active', inWhitelist);
+    quickAddChannelBtn.classList.toggle('active', allInWhitelist);
 
     const btnSpan = quickAddChannelBtn.querySelector('span');
-    if (btnSpan) btnSpan.textContent = inWhitelist ? t('remove') : t('add');
+    if (btnSpan) btnSpan.textContent = allInWhitelist ? t('remove') : t('add');
 }
 
 // Load and display filter rules (whitelist-only)
@@ -758,7 +675,8 @@ newRuleInput.addEventListener('keypress', (e) => {
 
 // Quick add channel button (toggle whitelist)
 quickAddChannelBtn.addEventListener('click', async () => {
-    if (!currentVideoInfo?.channelId) return;
+    const currentChannels = getCurrentVideoChannels();
+    if (currentChannels.length === 0) return;
 
     const result = await chrome.storage.sync.get(['filterRules']);
     const rules = result.filterRules || { whitelist: { channels: [], keywords: [] } };
@@ -768,18 +686,25 @@ quickAddChannelBtn.addEventListener('click', async () => {
         rules.whitelist = { channels: [], keywords: [] };
     }
 
-    const existingIndex = rules.whitelist.channels.findIndex(c => c.id === currentVideoInfo.channelId);
+    const allChannelsExist = currentChannels.every(channel =>
+        rules.whitelist.channels.some(savedChannel => savedChannel.id === channel.id)
+    );
 
-    if (existingIndex >= 0) {
+    if (allChannelsExist) {
         // Remove from whitelist
-        rules.whitelist.channels.splice(existingIndex, 1);
+        const currentChannelIds = new Set(currentChannels.map(channel => channel.id));
+        rules.whitelist.channels = rules.whitelist.channels.filter(channel => !currentChannelIds.has(channel.id));
         showToast(t('ruleRemoved'));
     } else {
-        // Add to whitelist
-        rules.whitelist.channels.push({
-            id: currentVideoInfo.channelId,
-            name: currentVideoInfo.channelName,
-            addedAt: Date.now()
+        // Add missing channels to whitelist
+        currentChannels.forEach(channel => {
+            if (!rules.whitelist.channels.some(savedChannel => savedChannel.id === channel.id)) {
+                rules.whitelist.channels.push({
+                    id: channel.id,
+                    name: channel.name,
+                    addedAt: Date.now()
+                });
+            }
         });
         showToast(t('ruleAdded'));
     }

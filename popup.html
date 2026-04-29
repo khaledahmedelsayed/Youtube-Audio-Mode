@@ -31,10 +31,10 @@
             </div>
         </div>
 
-        <div id="settings-panel" class="settings-panel">
+        <div id="filter-panel" class="settings-panel">
             <div class="settings-header">
-                <h2 data-i18n="appearance">Appearance</h2>
-                <button id="close-settings" class="icon-btn">
+                <h2 data-i18n="settings">Settings</h2>
+                <button id="close-filter" class="icon-btn">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M18 6L6 18M6 6l12 12"></path>
                     </svg>
@@ -43,49 +43,12 @@
 
             <div class="settings-content">
                 <div class="setting-group">
-                    <label data-i18n="backgroundType">Background Type</label>
-                    <div class="toggle-group">
-                        <button class="toggle-btn active" data-type="color" data-i18n="color">Color</button>
-                        <button class="toggle-btn" data-type="image" data-i18n="image">Image</button>
-                    </div>
-                </div>
-
-                <div id="color-options" class="setting-group">
-                    <label data-i18n="presets">Presets</label>
-                    <div class="theme-grid">
-                        <button class="theme-btn" data-theme="default"
-                            style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);"
-                            title="Default"></button>
-                        <button class="theme-btn" data-theme="sunset"
-                            style="background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 99%, #fecfef 100%);"
-                            title="Sunset"></button>
-                        <button class="theme-btn" data-theme="ocean"
-                            style="background: linear-gradient(135deg, #0ba360 0%, #3cba92 100%);"
-                            title="Ocean"></button>
-                        <button class="theme-btn" data-theme="midnight"
-                            style="background: linear-gradient(135deg, #2b5876 0%, #4e4376 100%);"
-                            title="Midnight"></button>
-                        <button class="theme-btn" data-theme="fire"
-                            style="background: linear-gradient(135deg, #f83600 0%, #fe8c00 100%);"
-                            title="Fire"></button>
-                        <button class="theme-btn" data-theme="minimal" style="background: #222;"
-                            title="Minimal Dark"></button>
-                    </div>
-
-                    <label style="margin-top: 12px; display: block;" data-i18n="customColor">Custom Color</label>
+                    <label data-i18n="audioModeBackground">Audio Mode Background</label>
+                    <p class="hint" data-i18n="audioModeBackgroundHint">Background color for the audio mode player overlay only</p>
                     <div class="color-picker-wrapper">
-                        <input type="color" id="custom-color-picker" value="#667eea">
-                        <span id="color-value-text">#667eea</span>
+                        <input type="color" id="audio-bg-color-picker" value="#667eea">
+                        <span id="audio-bg-color-value">#667eea</span>
                     </div>
-                </div>
-
-                <div id="image-options" class="setting-group hidden">
-                    <label data-i18n="imageUrl">Image URL</label>
-                    <div class="input-group">
-                        <input type="text" id="custom-image-url" placeholder="https://example.com/image.jpg">
-                        <button id="apply-image-btn" data-i18n="apply">Apply</button>
-                    </div>
-                    <p class="hint" data-i18n="imageHint">Paste a direct link to an image.</p>
                 </div>
 
                 <div class="setting-group">
@@ -101,20 +64,7 @@
                         <option value="auto">Auto</option>
                     </select>
                 </div>
-            </div>
-        </div>
 
-        <div id="filter-panel" class="settings-panel">
-            <div class="settings-header">
-                <h2 data-i18n="filterRules">Filter Rules</h2>
-                <button id="close-filter" class="icon-btn">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M18 6L6 18M6 6l12 12"></path>
-                    </svg>
-                </button>
-            </div>
-
-            <div class="settings-content">
                 <div class="filter-hint">
                     <p data-i18n="filterHint">Videos matching channels or keywords below will play in audio mode. All other videos play normally.</p>
                 </div>

@@ -15,41 +15,9 @@
     "message": "Toggle Audio Mode",
     "description": "Keyboard shortcut command description"
   },
-  "appearance": {
-    "message": "Appearance",
+  "settings": {
+    "message": "Settings",
     "description": "Settings panel header"
-  },
-  "backgroundType": {
-    "message": "Background Type",
-    "description": "Setting label for background type selection"
-  },
-  "color": {
-    "message": "Color",
-    "description": "Background type option: color"
-  },
-  "image": {
-    "message": "Image",
-    "description": "Background type option: image"
-  },
-  "presets": {
-    "message": "Presets",
-    "description": "Label for preset color themes"
-  },
-  "customColor": {
-    "message": "Custom Color",
-    "description": "Label for custom color picker"
-  },
-  "imageUrl": {
-    "message": "Image URL",
-    "description": "Label for image URL input"
-  },
-  "apply": {
-    "message": "Apply",
-    "description": "Button text to apply image URL"
-  },
-  "imageHint": {
-    "message": "Paste a direct link to an image.",
-    "description": "Hint text for image URL input"
   },
   "audioOnly": {
     "message": "Audio Only",
@@ -138,10 +106,6 @@
   "onlyYoutube": {
     "message": "Only works on YouTube videos",
     "description": "Message shown when not on YouTube"
-  },
-  "applied": {
-    "message": "Applied!",
-    "description": "Confirmation message after applying image"
   },
   "timeH": {
     "message": "h",
@@ -262,6 +226,14 @@
   "filterHint": {
     "message": "Videos matching channels or keywords below will play in audio mode. All other videos play normally.",
     "description": "Hint explaining how the filter works"
+  },
+  "audioModeBackground": {
+    "message": "Audio Mode Background",
+    "description": "Label for audio mode overlay background color"
+  },
+  "audioModeBackgroundHint": {
+    "message": "Background color for the audio mode player overlay only",
+    "description": "Hint clarifying the color picker affects the audio mode overlay, not the popup"
   },
   "preferredQuality": {
     "message": "Preferred Quality",

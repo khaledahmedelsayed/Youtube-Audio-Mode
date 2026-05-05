@@ -57,8 +57,9 @@ html {
   width: 380px;
   min-width: 360px;
   max-width: 420px;
-  height: 600px;
-  overflow: hidden;
+  max-height: 600px;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 body {
@@ -73,8 +74,9 @@ body {
   min-width: 360px;
   max-width: 420px;
   width: 380px;
-  height: 600px;
-  overflow: hidden;
+  min-height: 600px;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 /* RTL Support */
@@ -667,9 +669,12 @@ kbd {
   transform: translateY(0);
 }
 
-/* Prevent body scroll when panel is open */
-body:has(.settings-panel.open),
+/* Prevent background scroll when panel is open */
+html:has(.settings-panel.open),
+html.panel-open,
 body.panel-open {
+  height: 600px;
+  max-height: 600px;
   overflow: hidden !important;
 }
 
@@ -997,11 +1002,15 @@ input[type="color"]::-webkit-color-swatch {
 
 /* Rules List */
 .rules-list {
-  max-height: 120px;
+  max-height: 220px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+
+#channels-list {
+  max-height: 300px;
 }
 
 .rule-item {

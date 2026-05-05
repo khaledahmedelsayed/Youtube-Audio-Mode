@@ -418,6 +418,7 @@ let currentVideoInfo = null;
 
 function openSettingsPanel() {
     filterPanel.classList.add('open');
+    document.documentElement.classList.add('panel-open');
     document.body.classList.add('panel-open');
     loadFilterRules();
     fetchCurrentVideoInfo();
@@ -445,6 +446,7 @@ function getCurrentVideoChannels() {
 
 closeFilterBtn.addEventListener('click', () => {
     filterPanel.classList.remove('open');
+    document.documentElement.classList.remove('panel-open');
     document.body.classList.remove('panel-open');
 });
 

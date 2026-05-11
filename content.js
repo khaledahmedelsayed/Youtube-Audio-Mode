@@ -1407,7 +1407,7 @@ function updateOverlayTheme(type, value) {
     if (!audioModeOverlay) return;
 
     if (!type) type = 'color';
-    if (!value) value = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+    if (!value) value = '#991b1b';
 
     if (type === 'image') {
         audioModeOverlay.style.background = `url("${value}") no-repeat center center / cover`;

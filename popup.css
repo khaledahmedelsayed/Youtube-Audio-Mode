@@ -8,8 +8,8 @@
 
 :root {
   /* Color System */
-  --primary-color: #ef4444;
-  --primary-dark: #991b1b;
+  --primary-color: #6fa39a;
+  --primary-dark: #416a64;
   --bg-dark: #111113;
   --bg-dark-secondary: #18181b;
   --surface-1: #1b1b20;
@@ -210,7 +210,7 @@ body {
 
 input:checked + .slider {
   background: var(--primary-color);
-  border-color: #ef4444;
+  border-color: #6fa39a;
 }
 
 input:checked + .slider:before {
@@ -395,8 +395,8 @@ kbd {
 }
 
 .quality-tag {
-  background: rgba(239, 68, 68, 0.14);
-  color: #fecaca;
+  background: rgba(111, 163, 154, 0.16);
+  color: #d5f0eb;
   padding: 2px 6px;
   border-radius: 4px;
   font-size: 11px;
@@ -409,17 +409,17 @@ kbd {
 }
 
 .active-mode td {
-  background: rgba(239, 68, 68, 0.06);
+  background: rgba(111, 163, 154, 0.07);
 }
 
 /* Active State Styles */
 .toggle-section.active {
-  background: rgba(239, 68, 68, 0.1);
-  border-color: rgba(239, 68, 68, 0.3);
+  background: rgba(111, 163, 154, 0.1);
+  border-color: rgba(111, 163, 154, 0.3);
 }
 
 #status-text.active {
-  color: #ef4444;
+  color: #8fc1b8;
   font-weight: 500;
 }
 
@@ -468,9 +468,9 @@ kbd {
 }
 
 .mode-btn.active {
-  background: rgba(239, 68, 68, 0.12);
-  border-color: rgba(239, 68, 68, 0.65);
-  box-shadow: inset 0 0 0 1px rgba(239, 68, 68, 0.25);
+  background: rgba(111, 163, 154, 0.12);
+  border-color: rgba(111, 163, 154, 0.65);
+  box-shadow: inset 0 0 0 1px rgba(111, 163, 154, 0.25);
 }
 
 .mode-icon {
@@ -539,10 +539,10 @@ kbd {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  background: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.35);
+  background: rgba(111, 163, 154, 0.1);
+  border: 1px solid rgba(111, 163, 154, 0.35);
   border-radius: 8px;
-  color: #fca5a5;
+  color: #c6e8e2;
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
@@ -550,8 +550,8 @@ kbd {
 }
 
 .configure-filters-btn:hover {
-  background: rgba(239, 68, 68, 0.16);
-  border-color: rgba(239, 68, 68, 0.5);
+  background: rgba(111, 163, 154, 0.16);
+  border-color: rgba(111, 163, 154, 0.5);
 }
 
 .configure-filters-btn svg {
@@ -752,7 +752,7 @@ input[type="color"]::-webkit-color-swatch {
 }
 
 .input-group input:focus {
-  border-color: rgba(239, 68, 68, 0.75);
+  border-color: rgba(111, 163, 154, 0.75);
   background: var(--surface-2);
 }
 
@@ -801,7 +801,7 @@ input[type="color"]::-webkit-color-swatch {
 
 .quality-select:focus {
   outline: none;
-  border-color: rgba(239, 68, 68, 0.75);
+  border-color: rgba(111, 163, 154, 0.75);
   background-color: var(--surface-2);
 }
 
@@ -823,8 +823,8 @@ input[type="color"]::-webkit-color-swatch {
 
 /* Filter Hint */
 .filter-hint {
-  background: rgba(239, 68, 68, 0.08);
-  border: 1px solid rgba(239, 68, 68, 0.2);
+  background: rgba(111, 163, 154, 0.08);
+  border: 1px solid rgba(111, 163, 154, 0.2);
   border-radius: 8px;
   padding: 10px 12px;
   margin-bottom: 16px;
@@ -1081,7 +1081,7 @@ input[type="color"]::-webkit-color-swatch {
   bottom: 30px;
   left: 50%;
   transform: translateX(-50%) translateY(50px);
-  background: rgba(239, 68, 68, 0.95);
+  background: rgba(65, 106, 100, 0.96);
   color: var(--text-primary);
   padding: 10px 20px;
   border-radius: 8px;

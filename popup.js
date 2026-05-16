@@ -151,7 +151,7 @@ modeOffBtn.addEventListener('click', () => selectMode('off'));
 
 // Configure filters button opens the filter panel
 configureFiltersBtn.addEventListener('click', () => {
-    openSettingsPanel();
+    openSettingsPanel({ scrollToFilters: true });
 });
 
 // Stats Update Logic
@@ -358,7 +358,7 @@ chrome.storage.sync.get(['backgroundType', 'backgroundValue'], (result) => {
 
     const value = result.backgroundType === 'color' && result.backgroundValue?.startsWith('#')
         ? result.backgroundValue
-        : '#991b1b';
+        : '#26413f';
 
     audioBgColorPicker.value = value;
     audioBgColorValue.textContent = value;
@@ -416,12 +416,23 @@ const addRuleBtn = document.getElementById('add-rule-btn');
 
 let currentVideoInfo = null;
 
-function openSettingsPanel() {
+function openSettingsPanel(options = {}) {
     filterPanel.classList.add('open');
     document.documentElement.classList.add('panel-open');
     document.body.classList.add('panel-open');
     loadFilterRules();
     fetchCurrentVideoInfo();
+
+    if (options.scrollToFilters) {
+        requestAnimationFrame(() => {
+            const settingsContent = filterPanel.querySelector('.settings-content');
+            const filterTarget = document.getElementById('quick-add-section');
+
+            if (!settingsContent || !filterTarget) return;
+
+            settingsContent.scrollTop = filterTarget.offsetTop - settingsContent.offsetTop;
+        });
+    }
 }
 
 settingsBtn.addEventListener('click', () => {

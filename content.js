@@ -1407,7 +1407,7 @@ function updateOverlayTheme(type, value) {
     if (!audioModeOverlay) return;
 
     if (!type) type = 'color';
-    if (!value) value = '#991b1b';
+    if (!value) value = '#26413f';
 
     if (type === 'image') {
         audioModeOverlay.style.background = `url("${value}") no-repeat center center / cover`;

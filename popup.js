@@ -358,7 +358,7 @@ chrome.storage.sync.get(['backgroundType', 'backgroundValue'], (result) => {
 
     const value = result.backgroundType === 'color' && result.backgroundValue?.startsWith('#')
         ? result.backgroundValue
-        : '#26413f';
+        : '#14532d';
 
     audioBgColorPicker.value = value;
     audioBgColorValue.textContent = value;

@@ -7,6 +7,20 @@ const configureFiltersBtn = document.getElementById('configure-filters-btn');
 const langBtn = document.getElementById('lang-btn');
 const settingsBtn = document.getElementById('settings-btn');
 
+const DEFAULT_BACKGROUND_COLOR = '#172554';
+const SETTINGS_EXPORT_KEYS = [
+    'audioMode',
+    'audioModeType',
+    'language',
+    'backgroundType',
+    'backgroundValue',
+    'preferredQuality',
+    'filterRules'
+];
+const VALID_MODE_TYPES = new Set(['always', 'filtered', 'off']);
+const VALID_LANGUAGES = new Set(['en', 'ar']);
+const VALID_QUALITY_VALUES = new Set(['hd2160', 'hd1440', 'hd1080', 'hd720', 'large', 'medium', 'auto']);
+
 // Current audio mode type: 'always', 'filtered', or 'off'
 let currentModeType = 'always';
 
@@ -352,13 +366,16 @@ updateShortcutDisplay();
 const audioBgColorPicker = document.getElementById('audio-bg-color-picker');
 const audioBgColorValue = document.getElementById('audio-bg-color-value');
 const qualitySelect = document.getElementById('quality-select');
+const exportSettingsBtn = document.getElementById('export-settings-btn');
+const importSettingsBtn = document.getElementById('import-settings-btn');
+const importSettingsFile = document.getElementById('import-settings-file');
 
 chrome.storage.sync.get(['backgroundType', 'backgroundValue'], (result) => {
     if (!audioBgColorPicker || !audioBgColorValue) return;
 
     const value = result.backgroundType === 'color' && result.backgroundValue?.startsWith('#')
         ? result.backgroundValue
-        : '#14532d';
+        : DEFAULT_BACKGROUND_COLOR;
 
     audioBgColorPicker.value = value;
     audioBgColorValue.textContent = value;
@@ -403,6 +420,201 @@ if (qualitySelect) {
     qualitySelect.addEventListener('change', () => {
         const quality = qualitySelect.value;
         chrome.storage.sync.set({ preferredQuality: quality });
+    });
+}
+
+function getDefaultFilterRules() {
+    return { whitelist: { channels: [], keywords: [] } };
+}
+
+function sanitizeFilterRules(filterRules) {
+    const rules = filterRules && typeof filterRules === 'object' ? filterRules : getDefaultFilterRules();
+    const whitelist = rules.whitelist && typeof rules.whitelist === 'object' ? rules.whitelist : {};
+    const seenChannels = new Set();
+    const seenKeywords = new Set();
+
+    const channels = Array.isArray(whitelist.channels) ? whitelist.channels : [];
+    const keywords = Array.isArray(whitelist.keywords) ? whitelist.keywords : [];
+
+    return {
+        whitelist: {
+            channels: channels.reduce((items, channel) => {
+                if (!channel || typeof channel !== 'object') return items;
+
+                const id = typeof channel.id === 'string' ? channel.id.trim() : '';
+                const name = typeof channel.name === 'string' ? channel.name.trim() : '';
+                if (!id || seenChannels.has(id)) return items;
+
+                seenChannels.add(id);
+                items.push({
+                    id,
+                    name: name || id,
+                    addedAt: Number.isFinite(channel.addedAt) ? channel.addedAt : Date.now()
+                });
+                return items;
+            }, []),
+            keywords: keywords.reduce((items, keywordRule) => {
+                if (!keywordRule || typeof keywordRule !== 'object') return items;
+
+                const keyword = typeof keywordRule.keyword === 'string' ? keywordRule.keyword.trim() : '';
+                const keywordKey = keyword.toLowerCase();
+                if (!keyword || seenKeywords.has(keywordKey)) return items;
+
+                seenKeywords.add(keywordKey);
+                items.push({
+                    keyword,
+                    caseSensitive: keywordRule.caseSensitive === true,
+                    addedAt: Number.isFinite(keywordRule.addedAt) ? keywordRule.addedAt : Date.now()
+                });
+                return items;
+            }, [])
+        }
+    };
+}
+
+function sanitizeImportedSettings(payload) {
+    const source = payload?.settings && typeof payload.settings === 'object'
+        ? payload.settings
+        : payload;
+
+    if (!source || typeof source !== 'object' || Array.isArray(source)) {
+        throw new Error('Invalid settings file');
+    }
+
+    const settings = {};
+
+    if (VALID_MODE_TYPES.has(source.audioModeType)) {
+        settings.audioModeType = source.audioModeType;
+    }
+
+    if (typeof source.audioMode === 'boolean') {
+        settings.audioMode = source.audioMode;
+    }
+
+    if (VALID_LANGUAGES.has(source.language)) {
+        settings.language = source.language;
+    }
+
+    if (source.backgroundType === 'color' && /^#[0-9a-f]{6}$/i.test(source.backgroundValue || '')) {
+        settings.backgroundType = 'color';
+        settings.backgroundValue = source.backgroundValue;
+    }
+
+    if (VALID_QUALITY_VALUES.has(source.preferredQuality)) {
+        settings.preferredQuality = source.preferredQuality;
+    }
+
+    if (source.filterRules) {
+        settings.filterRules = sanitizeFilterRules(source.filterRules);
+    }
+
+    if (Object.keys(settings).length === 0) {
+        throw new Error('No supported settings found');
+    }
+
+    return settings;
+}
+
+function sendMessageToActiveYouTube(message) {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        const currentTab = tabs[0];
+        if (currentTab?.url?.includes('youtube.com')) {
+            chrome.tabs.sendMessage(currentTab.id, message).catch(() => {
+                // Ignore errors if content script is not ready
+            });
+        }
+    });
+}
+
+async function applyImportedSettings(settings) {
+    if (settings.audioModeType) {
+        currentModeType = settings.audioModeType;
+        updateModeUI(currentModeType);
+        sendMessageToActiveYouTube({
+            action: 'modeChanged',
+            mode: currentModeType
+        });
+    }
+
+    if (settings.language) {
+        await setLanguage(settings.language);
+    }
+
+    if (settings.backgroundType === 'color' && settings.backgroundValue) {
+        if (audioBgColorPicker) audioBgColorPicker.value = settings.backgroundValue;
+        if (audioBgColorValue) audioBgColorValue.textContent = settings.backgroundValue;
+        sendMessageToActiveYouTube({
+            action: 'updateTheme',
+            backgroundType: settings.backgroundType,
+            backgroundValue: settings.backgroundValue
+        });
+    }
+
+    if (settings.preferredQuality && qualitySelect) {
+        qualitySelect.value = settings.preferredQuality;
+    }
+
+    if (settings.filterRules) {
+        loadFilterRules();
+        updateQuickAddButtonState();
+    }
+}
+
+async function exportSettings() {
+    const settings = await chrome.storage.sync.get(SETTINGS_EXPORT_KEYS);
+    const payload = {
+        app: 'youtube-audio-mode',
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        settings
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const date = new Date().toISOString().slice(0, 10);
+
+    link.href = url;
+    link.download = `youtube-audio-mode-settings-${date}.json`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+    showToast(t('settingsExported'));
+}
+
+async function importSettings(file) {
+    const text = await file.text();
+    const payload = JSON.parse(text);
+    const settings = sanitizeImportedSettings(payload);
+
+    await chrome.storage.sync.set(settings);
+    await applyImportedSettings(settings);
+    showToast(t('settingsImported'));
+}
+
+if (exportSettingsBtn) {
+    exportSettingsBtn.addEventListener('click', () => {
+        exportSettings().catch(error => {
+            console.error('[Audio Mode] Failed to export settings:', error);
+            showToast(t('settingsExportFailed'));
+        });
+    });
+}
+
+if (importSettingsBtn && importSettingsFile) {
+    importSettingsBtn.addEventListener('click', () => {
+        importSettingsFile.click();
+    });
+
+    importSettingsFile.addEventListener('change', () => {
+        const file = importSettingsFile.files?.[0];
+        importSettingsFile.value = '';
+        if (!file) return;
+
+        importSettings(file).catch(error => {
+            console.error('[Audio Mode] Failed to import settings:', error);
+            showToast(t('settingsImportFailed'));
+        });
     });
 }
 

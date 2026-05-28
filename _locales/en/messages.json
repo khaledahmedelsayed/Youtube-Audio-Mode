@@ -242,5 +242,37 @@
   "qualityHint": {
     "message": "Quality to use when audio mode is off",
     "description": "Hint text for quality selector"
+  },
+  "settingsBackup": {
+    "message": "Import / Export Settings",
+    "description": "Label for import/export settings controls"
+  },
+  "settingsBackupHint": {
+    "message": "Back up or restore mode, appearance, quality, and filter rules",
+    "description": "Hint for import/export settings controls"
+  },
+  "exportSettings": {
+    "message": "Export",
+    "description": "Export settings button text"
+  },
+  "importSettings": {
+    "message": "Import",
+    "description": "Import settings button text"
+  },
+  "settingsExported": {
+    "message": "Settings exported",
+    "description": "Toast message after exporting settings"
+  },
+  "settingsImported": {
+    "message": "Settings imported",
+    "description": "Toast message after importing settings"
+  },
+  "settingsExportFailed": {
+    "message": "Could not export settings",
+    "description": "Toast message when exporting settings fails"
+  },
+  "settingsImportFailed": {
+    "message": "Could not import settings",
+    "description": "Toast message when importing settings fails"
   }
 }

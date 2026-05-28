@@ -246,5 +246,37 @@
     "qualityHint": {
         "message": "الجودة المستخدمة عند إيقاف وضع الصوت",
         "description": "Hint text for quality selector"
+    },
+    "settingsBackup": {
+        "message": "استيراد / تصدير الإعدادات",
+        "description": "Label for import/export settings controls"
+    },
+    "settingsBackupHint": {
+        "message": "نسخ أو استعادة الوضع والمظهر والجودة وقواعد التصفية",
+        "description": "Hint for import/export settings controls"
+    },
+    "exportSettings": {
+        "message": "تصدير",
+        "description": "Export settings button text"
+    },
+    "importSettings": {
+        "message": "استيراد",
+        "description": "Import settings button text"
+    },
+    "settingsExported": {
+        "message": "تم تصدير الإعدادات",
+        "description": "Toast message after exporting settings"
+    },
+    "settingsImported": {
+        "message": "تم استيراد الإعدادات",
+        "description": "Toast message after importing settings"
+    },
+    "settingsExportFailed": {
+        "message": "تعذر تصدير الإعدادات",
+        "description": "Toast message when exporting settings fails"
+    },
+    "settingsImportFailed": {
+        "message": "تعذر استيراد الإعدادات",
+        "description": "Toast message when importing settings fails"
     }
 }

@@ -1,125 +1,112 @@
-<!-- ![YouTube Audio Mode](promo_images/marquee_promo.png) -->
+# YouTube Audio Mode
 
-# YouTube Audio Mode (Enhanced Fork)
+> Enhanced fork of [YouTube Audio Mode](https://github.com/devahmedadli/youtube-audio-mode) by [Ahmed Adli](https://github.com/devahmedadli).
 
-> **This is a fork of [YouTube Audio Mode](https://github.com/devahmedadli/youtube-audio-mode) by [Ahmed Adli](https://github.com/devahmedadli).**
+Save bandwidth and keep YouTube focused on listening. This Chrome extension switches YouTube videos into audio-only playback by forcing low video quality, hiding the video player, and showing a lightweight audio-mode overlay.
 
-**Save bandwidth and enjoy distraction-free listening on YouTube.**
+## Key Features
 
-YouTube Audio Mode is a lightweight Chrome extension that transforms your YouTube experience by playing videos in audio-only mode. It intelligently forces the video quality to 144p and hides the video player, replacing it with a beautiful audio visualizer. This drastically reduces internet data usage, listening to podcasts, or saving bandwidth on metered connections.
+- **Three audio modes:** choose Always On, Filtered, or Off from the popup.
+- **Filtered audio mode:** enable audio mode only for saved channels or title keywords.
+- **Multi-channel detection:** videos with multiple credited channels can be added to filters and matched reliably.
+- **Preferred quality restore:** choose the quality YouTube should use when audio mode is off.
+- **Usage statistics:** estimate saved data compared with 720p and 1080p, plus listened and active time.
+- **Audio-mode overlay background:** customize the player overlay background color. This setting affects the audio-mode overlay only, not the popup UI.
+- **Settings import/export:** back up and restore mode, appearance, preferred quality, and filter rules as JSON.
+- **English and Arabic UI:** includes RTL support for Arabic.
+- **Private by default:** preferences and usage data stay in Chrome storage on your device.
 
-## ✨ Key Features
+## Operating Modes
 
-- **🎧 One-Click Audio Mode:** Toggle audio-only playback instantly with a simple switch or keyboard shortcut (`Alt+Shift+A`) for Windows and `Option+Shift+A` for macOS.
-- **📉 Smart Data Saving:** Automatically sets video quality to **144p** to minimize bandwidth consumption while keeping audio clear.
-- **📊 Usage Statistics:** Track exactly how much data you've saved compared to 720p/1080p, along with your total listening time.
-- **🎵 Audio Visualizer:** A stunning, animated visualizer replaces the blank video screen.
-- **🎨 Custom Themes:** Choose from 6 beautiful gradient presets or customize the background with your own colors or images.
-- **🔒 Privacy Focused:** All data and preferences are stored locally on your device. No external tracking.
+**Always On**
+Audio mode is enabled for all YouTube videos.
 
----
+**Filtered**
+Audio mode is enabled only when the current video matches your saved channel or keyword rules. The Configure Filters button opens Settings directly at the filter section.
 
-## 🆕 New Features in This Fork
+**Off**
+The extension is disabled and YouTube plays normally using your preferred quality.
 
-### Three Operating Modes
-- **Always On:** Audio mode enabled on all YouTube videos (original behavior)
-- **Filtered:** Audio mode only for whitelisted channels/keywords
-- **Off:** Extension completely disabled, normal YouTube experience
+## Filter Rules
 
-### Filter Mode (Whitelist-based)
-- **Channel Whitelist:** Audio mode activates only for specific channels you add
-- **Keyword Filtering:** Match video titles against keywords (e.g., "podcast", "music")
-- **Quick-Add Button:** Instantly add the current channel to your whitelist from the popup
-- **Playlist Support:** Properly handles playlists with mixed content (some videos filtered, some not)
-- **Badge Indicator:** Shows "ON" for always mode, "FLT" for filtered mode, or no badge when off
+Filtered mode supports:
 
-### Quality Preference Management
-- **Preferred Quality Selector:** Choose your default video quality (720p, 1080p, 4K, etc.)
-- **Smart Quality Restore:** When audio mode is disabled, video restores to your preferred quality
-- **Persistent Settings:** Quality preference saved across sessions
+- Saved YouTube channels
+- Videos credited to multiple channels
+- Title keywords
+- Quick-add for the current video channel
 
-### Internationalization (i18n)
-- **Multi-language Support:** Full English and Arabic translations
-- **RTL Support:** Proper right-to-left layout for Arabic
+Videos matching saved channels or keywords play in audio mode. All other videos play normally.
 
-### Bug Fixes & Improvements
-- Fixed audio mode not triggering on YouTube SPA navigation
-- Fixed settings icon becoming unclickable after navigating between videos
-- Improved keyword filtering reliability during navigation
-- Better quality restoration when toggling audio mode off
-- Fixed 144p quality not being applied when navigating between filtered videos
-- Fixed playlist navigation not re-checking filter rules between videos
-- Improved video detection reliability on initial page load
-- Added retry logic for popup channel info fetching
+## Settings
 
-## 🚀 Installation
+The Settings panel includes:
 
- Manual Installation (Developer Mode)
+- Audio-mode overlay background color
+- Preferred quality for normal video playback
+- Import / Export Settings
+- Current channel quick-add
+- Keyword entry
+- Saved channel and keyword lists
 
-1.  Clone or download this repository.
-2.  Open Chrome and go to `chrome://extensions/`.
-3.  Enable **Developer mode** in the top-right corner.
-4.  Click **Load unpacked**.
-5.  Select the folder where you downloaded this repository.
+Exported settings include extension mode, language, overlay background, preferred quality, and filter rules. Usage statistics are not included in settings exports.
 
-## 📖 How to Use
+## Installation
 
-1.  Open any YouTube video.
-2.  Click the **YouTube Audio Mode** icon in your browser toolbar.
-3.  Select your preferred mode:
-    - **Always On:** Audio mode on all videos
-    - **Filtered:** Audio mode only for whitelisted channels/keywords
-    - **Off:** Disable the extension
-4.  For Filtered mode, click **Configure Filters** to add channels or keywords.
-5.  The video player will be hidden, and the visualizer will appear when audio mode is active.
-6.  To customize the look, click the **Settings (Gear)** icon in the popup.
+1. Clone or download this repository.
+2. Open Chrome and go to `chrome://extensions/`.
+3. Enable **Developer mode**.
+4. Click **Load unpacked**.
+5. Select this repository folder.
 
-## ⌨️ Shortcuts
+## How To Use
 
-- **Toggle Audio Mode:** `Alt` + `Shift` + `A` for Windows and `Option` + `Shift` + `A` for macOS.
+1. Open any YouTube video.
+2. Click the **YouTube Audio Mode** extension icon.
+3. Pick **Always On**, **Filtered**, or **Off**.
+4. In Filtered mode, click **Configure Filters** to add channels or keywords.
+5. Use Settings to change preferred quality, overlay background, or import/export settings.
 
-## 📊 Statistics & Privacy
+## Shortcut
 
-This extension calculates data savings based on average YouTube bitrate values:
+- **Toggle Audio Mode:** `Alt + Shift + A` on Windows/Linux, `Option + Shift + A` on macOS.
 
-- **144p (Audio Mode):** ~0.75 MB/min
-- **720p (Standard):** ~18.75 MB/min
-- **1080p (HD):** ~33.75 MB/min
+Chrome shortcuts can be changed at `chrome://extensions/shortcuts`.
 
-**Privacy Policy:**
-We do not collect any personal data. All preferences and usage statistics are stored locally on your machine using the Chrome Storage API. For more details, see [PRIVACY_POLICY.md](PRIVACY_POLICY.md).
+## Data Usage Estimates
 
-## 🛠️ Development
+The popup estimates savings using average bitrate values:
 
-### Project Structure
+- **144p audio mode:** about 0.75 MB/min
+- **720p video:** about 18.75 MB/min
+- **1080p video:** about 33.75 MB/min
 
-- `manifest.json` - Extension configuration (Manifest V3)
-- `background.js` - Service worker for background tasks
-- `content.js` - Main logic for handling the video player and visualizer DOM
-- `popup.html/js/css` - The extension interface
-- `overlay.css` - Styles for the visualizer overlay
+These numbers are estimates and can vary by video, codec, and network conditions.
 
-### Tech Stack
+## Privacy
 
-- HTML5, CSS3, JavaScript (ES6+)
-- Chrome Extension API (Manifest V3)
+This extension does not collect personal data. Settings are stored with the Chrome Storage API, and usage statistics are stored locally. See [PRIVACY_POLICY.md](PRIVACY_POLICY.md) for details.
 
-## 🤝 Contributing
+## Development
 
-Contributions are welcome! If you have ideas for new features or bug fixes:
+Project structure:
 
-1.  Fork the repository.
-2.  Create your feature branch (`git checkout -b feature/AmazingFeature`).
-3.  Commit your changes (`git commit -m 'Add some AmazingFeature'`).
-4.  Push to the branch (`git push origin feature/AmazingFeature`).
-5.  Open a Pull Request.
+- `manifest.json` - Chrome extension manifest
+- `background.js` - service worker and badge handling
+- `content.js` - YouTube page behavior, quality switching, filter matching, overlay logic
+- `popup.html`, `popup.js`, `popup.css` - popup UI and settings
+- `overlay.css` - audio-mode overlay styles
+- `_locales/` - English and Arabic translations
 
-## 📝 License
+Tech stack:
+
+- HTML, CSS, JavaScript
+- Chrome Extension API
+- Manifest V3
+
+## License
 
 This project is licensed under the MIT License.
 
----
-
-_Original extension by [Ahmed Adli](https://github.com/devahmedadli)_
-
-_Fork enhancements by [Khaled Ahmed Elsayed](https://github.com/khaledahmedelsayed)_
+Original extension by [Ahmed Adli](https://github.com/devahmedadli).
+Fork enhancements by [Khaled Ahmed Elsayed](https://github.com/khaledahmedelsayed).

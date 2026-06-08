@@ -67,12 +67,6 @@ Exported settings include extension mode, language, overlay background, preferre
 4. In Filtered mode, click **Configure Filters** to add channels or keywords.
 5. Use Settings to change preferred quality, overlay background, or import/export settings.
 
-## Shortcut
-
-- **Toggle Audio Mode:** `Alt + Shift + A` on Windows/Linux, `Option + Shift + A` on macOS.
-
-Chrome shortcuts can be changed at `chrome://extensions/shortcuts`.
-
 ## Data Usage Estimates
 
 The popup estimates savings using average bitrate values:

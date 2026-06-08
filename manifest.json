@@ -26,17 +26,6 @@
     "background": {
         "service_worker": "background.js"
     },
-    "commands": {
-        "toggle-audio-mode": {
-            "suggested_key": {
-                "default": "Alt+Shift+A",
-                "mac": "Alt+Shift+A",
-                "windows": "Alt+Shift+A",
-                "linux": "Alt+Shift+A"
-            },
-            "description": "__MSG_toggleCommand__"
-        }
-    },
     "content_scripts": [
         {
             "matches": [

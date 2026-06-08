@@ -11,10 +11,6 @@
     "message": "Play YouTube videos in audio-only mode to save bandwidth and reduce internet usage",
     "description": "Extension description shown in Chrome Web Store"
   },
-  "toggleCommand": {
-    "message": "Toggle Audio Mode",
-    "description": "Keyboard shortcut command description"
-  },
   "settings": {
     "message": "Settings",
     "description": "Settings panel header"
@@ -58,10 +54,6 @@
   "modeOffDesc": {
     "message": "Extension disabled",
     "description": "Description for off mode"
-  },
-  "shortcut": {
-    "message": "Shortcut(click to change):",
-    "description": "Label for keyboard shortcut display"
   },
   "thisMonth": {
     "message": "This Month",

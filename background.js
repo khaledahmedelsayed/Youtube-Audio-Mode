@@ -1,5 +1,5 @@
 // Background script for YouTube Audio Mode
-// Handles keyboard shortcuts and badge updates
+// Handles badge updates
 
 // Initialize state on install
 chrome.runtime.onInstalled.addListener(() => {
@@ -61,33 +61,3 @@ function monitorStorageQuota() {
     });
 }
 
-// Handle keyboard shortcuts
-chrome.commands.onCommand.addListener((command) => {
-    if (command === 'toggle-audio-mode') {
-        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-            const currentTab = tabs[0];
-            if (currentTab && currentTab.url.includes('youtube.com')) {
-                // Send toggle message to content script
-                chrome.tabs.sendMessage(currentTab.id, { action: 'toggleAudioMode' }, (response) => {
-                    // Update storage if content script handles it
-                    // (The content script updates storage, which triggers the onChanged listener above)
-
-                    // Fallback: inject content script if not ready
-                    if (chrome.runtime.lastError) {
-                        console.log('Content script not ready, injecting script...');
-                        chrome.scripting.executeScript({
-                            target: { tabId: currentTab.id },
-                            files: ['content.js']
-                        }, () => {
-                            // Toggle state after script is loaded
-                            chrome.storage.sync.get(['audioMode'], (result) => {
-                                const newState = !result.audioMode;
-                                chrome.storage.sync.set({ audioMode: newState });
-                            });
-                        });
-                    }
-                });
-            }
-        });
-    }
-});

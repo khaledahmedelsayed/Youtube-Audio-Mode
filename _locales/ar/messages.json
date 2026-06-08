@@ -11,10 +11,6 @@
         "message": "شغّل فيديوهات يوتيوب في وضع الصوت فقط لتوفير استهلاك الإنترنت",
         "description": "Extension description shown in Chrome Web Store"
     },
-    "toggleCommand": {
-        "message": "تبديل وضع الصوت",
-        "description": "Keyboard shortcut command description"
-    },
     "settings": {
         "message": "الإعدادات",
         "description": "Settings panel header"
@@ -58,10 +54,6 @@
     "modeOffDesc": {
         "message": "الإضافة معطلة",
         "description": "Description for off mode"
-    },
-    "shortcut": {
-        "message": "الاختصار (اضغط للتغيير):",
-        "description": "Label for keyboard shortcut display"
     },
     "thisMonth": {
         "message": "هذا الشهر",

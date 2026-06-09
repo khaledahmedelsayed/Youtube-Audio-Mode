@@ -4,6 +4,8 @@
 
 Save bandwidth and keep YouTube focused on listening. This Chrome extension switches YouTube videos into audio-only playback by forcing low video quality, hiding the video player, and showing a lightweight audio-mode overlay.
 
+[Install from the Chrome Web Store](https://chromewebstore.google.com/detail/youtube-audio-mode/chjcfgfdkjkodkjcmooholonanhldeeh)
+
 ## Key Features
 
 - **Three audio modes:** choose Always On, Filtered, or Off from the popup.
@@ -52,6 +54,10 @@ The Settings panel includes:
 Exported settings include extension mode, language, overlay background, preferred quality, and filter rules. Usage statistics are not included in settings exports.
 
 ## Installation
+
+Install the published extension from the [Chrome Web Store](https://chromewebstore.google.com/detail/youtube-audio-mode/chjcfgfdkjkodkjcmooholonanhldeeh).
+
+Manual installation for development:
 
 1. Clone or download this repository.
 2. Open Chrome and go to `chrome://extensions/`.

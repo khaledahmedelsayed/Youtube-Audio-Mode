@@ -46,6 +46,7 @@ function loadContentScript(timers) {
             warn() {}
         },
         URLSearchParams,
+        Image: class Image {},
         KeyboardEvent: class KeyboardEvent {},
         MutationObserver: class MutationObserver {
             observe() {}
@@ -130,6 +131,15 @@ globalThis.__audioModeTestApi = {
     forceLowestQuality,
     clickQualitySetting,
     extractPageChannels,
+    normalizePlayerLook,
+    thumbnailUrl,
+    createAudioModeOverlay,
+    setPlayerLook,
+    updateOverlayTheme,
+    updateOverlayContent,
+    getOverlayForTest() {
+        return audioModeOverlay;
+    },
     setDocumentForTest(documentForTest) {
         globalThis.document = documentForTest;
     },

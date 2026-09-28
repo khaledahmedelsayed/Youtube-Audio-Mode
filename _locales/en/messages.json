@@ -119,13 +119,9 @@
     "message": " MB",
     "description": "Data unit: megabytes"
   },
-  "activeTitle": {
-    "message": "Audio Mode Active",
-    "description": "Overlay title when audio mode is active"
-  },
-  "activeDesc": {
-    "message": "Saving your bandwidth",
-    "description": "Overlay description when audio mode is active"
+  "overlayListening": {
+    "message": "Listening",
+    "description": "Overlay label shown above the video title in audio mode"
   },
   "filterRules": {
     "message": "Filter Rules",

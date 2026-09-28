@@ -56,6 +56,30 @@ let modeApplyQueued = false;
 let manualOverride = null; // { videoId, audio } - per-video manual switch
 let lastDecision = { audio: false, reason: 'none' };
 
+// Overlay ("player look") state
+const PLAYER_LOOKS = ['card', 'blur', 'minimal', 'waves'];
+const SVG_NS = 'http://www.w3.org/2000/svg';
+let currentPlayerLook = 'card';
+
+/**
+ * Return a supported player look, falling back to 'card' for unknown values
+ * @param {*} value - Stored or requested look
+ * @returns {string} One of PLAYER_LOOKS
+ */
+function normalizePlayerLook(value) {
+    return PLAYER_LOOKS.includes(value) ? value : 'card';
+}
+
+/**
+ * Build the YouTube thumbnail URL for a video ID
+ * @param {*} videoId - Value of the `v` URL param
+ * @returns {string|null} Thumbnail URL, or null when the ID is not a valid video ID
+ */
+function thumbnailUrl(videoId) {
+    if (typeof videoId !== 'string' || !/^[\w-]{11}$/.test(videoId)) return null;
+    return `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
+}
+
 // Quality operation locking state - prevents duplicate popup openings
 let qualityOperationInProgress = false;
 let qualityOperationTimeout = null;
@@ -92,7 +116,7 @@ async function loadMessages(lang) {
 // Initialize by checking saved preference
 if (chrome.runtime?.id) {
     try {
-        chrome.storage.sync.get(['audioModeType', 'language', 'preferredQuality'], async function (result) {
+        chrome.storage.sync.get(['audioModeType', 'language', 'preferredQuality', 'playerLook'], async function (result) {
             if (chrome.runtime.lastError) {
                 console.log('[Audio Mode] Could not load initial state:', chrome.runtime.lastError);
                 return;
@@ -115,6 +139,9 @@ if (chrome.runtime?.id) {
 
             // Set the current mode type
             currentModeType = result.audioModeType || 'always';
+
+            // Overlay look
+            currentPlayerLook = normalizePlayerLook(result.playerLook);
 
             // Apply mode logic
             scheduleModeLogic('initial state', 0);
@@ -783,6 +810,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         sendResponse({ ok: true });
     } else if (request.action === 'updateTheme') {
         updateOverlayTheme(request.backgroundType, request.backgroundValue);
+    } else if (request.action === 'playerLookChanged') {
+        setPlayerLook(request.look);
+        sendResponse({ ok: true });
     } else if (request.action === 'updateLanguage') {
         currentLanguage = request.language;
         updateOverlayLanguage().then(() => {
@@ -817,6 +847,10 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
             // Filter rules changed while in filtered mode
             lastAppliedVideoId = null;
             scheduleModeLogic('filter rules change', 100);
+        }
+
+        if (changes.playerLook) {
+            setPlayerLook(changes.playerLook.newValue);
         }
     }
 });
@@ -1479,6 +1513,205 @@ function setLowestQualityInternal(onComplete = null) {
     forceLowestQuality(player, video, onComplete);
 }
 
+/**
+ * Create an SVG element with the given attributes
+ * @param {string} tag - SVG tag name
+ * @param {Object} attrs - Attribute map
+ * @returns {SVGElement}
+ */
+function createSvgElement(tag, attrs = {}) {
+    const el = document.createElementNS(SVG_NS, tag);
+    for (const [name, value] of Object.entries(attrs)) {
+        el.setAttribute(name, String(value));
+    }
+    return el;
+}
+
+/**
+ * Build the headphones icon used by the minimal look
+ * @returns {SVGElement}
+ */
+function createHeadphonesIcon() {
+    const svg = createSvgElement('svg', {
+        width: 28,
+        height: 28,
+        viewBox: '0 0 24 24',
+        fill: 'none',
+        stroke: 'currentColor',
+        'stroke-width': 2.2,
+        'stroke-linecap': 'round',
+        'aria-hidden': 'true'
+    });
+    svg.appendChild(createSvgElement('path', { d: 'M4 15v-3a8 8 0 0 1 16 0v3' }));
+    svg.appendChild(createSvgElement('rect', { x: 3, y: 14, width: 5, height: 7, rx: 2 }));
+    svg.appendChild(createSvgElement('rect', { x: 16, y: 14, width: 5, height: 7, rx: 2 }));
+    return svg;
+}
+
+/**
+ * Build the drifting waves SVG used by the waves look
+ * @returns {SVGElement}
+ */
+function createWavesGraphic() {
+    // The path repeats every 100 units, so a -50% drift over 2000 units loops seamlessly
+    let d = 'M0 45';
+    for (let x = 0; x <= 2000; x += 50) {
+        d += ` Q${x + 25} ${x % 100 ? 70 : 20} ${x + 50} 45`;
+    }
+
+    const svg = createSvgElement('svg', {
+        class: 'em-waves',
+        viewBox: '0 0 2000 90',
+        preserveAspectRatio: 'none',
+        'aria-hidden': 'true'
+    });
+    svg.appendChild(createSvgElement('path', {
+        d, fill: 'none', stroke: '#F2C14E', 'stroke-width': 3, opacity: 0.9
+    }));
+    svg.appendChild(createSvgElement('path', {
+        d, fill: 'none', stroke: '#F2C14E', 'stroke-width': 2, opacity: 0.35, transform: 'translate(25 6)'
+    }));
+    return svg;
+}
+
+/**
+ * Append the kicker, title and channel lines to a container.
+ * Title and channel come from the page, so they are only ever set via textContent.
+ * @param {HTMLElement} parent - Container to fill
+ */
+function appendOverlayText(parent) {
+    const kicker = document.createElement('span');
+    kicker.className = 'em-kicker';
+    kicker.textContent = t('overlayListening');
+
+    const title = document.createElement('b');
+    title.className = 'em-title';
+
+    const channel = document.createElement('span');
+    channel.className = 'em-channel';
+
+    parent.appendChild(kicker);
+    parent.appendChild(title);
+    parent.appendChild(channel);
+}
+
+/**
+ * Build the inner DOM for a player look
+ * @param {string} look - One of PLAYER_LOOKS
+ * @returns {HTMLElement[]} Top-level children for the overlay root
+ */
+function buildOverlayLook(look) {
+    const text = document.createElement('div');
+    text.className = 'em-ov-text';
+
+    if (look === 'card') {
+        const card = document.createElement('div');
+        card.className = 'em-np-card';
+        const art = document.createElement('div');
+        art.className = 'em-np-art';
+        const meta = document.createElement('div');
+        meta.className = 'em-np-meta';
+        appendOverlayText(meta);
+        card.appendChild(art);
+        card.appendChild(meta);
+        return [card];
+    }
+
+    if (look === 'minimal') {
+        const ring = document.createElement('div');
+        ring.className = 'em-ring';
+        ring.appendChild(createHeadphonesIcon());
+        text.appendChild(ring);
+        appendOverlayText(text);
+        return [text];
+    }
+
+    appendOverlayText(text);
+    if (look === 'waves') {
+        return [createWavesGraphic(), text];
+    }
+    return [text]; // blur
+}
+
+/**
+ * Point the overlay's --em-thumb at the current video's thumbnail.
+ * Falls back to --em-bg (via CSS) when there is no valid ID or the image fails to load.
+ * @param {string|null} videoId - Current video ID
+ */
+function applyOverlayThumbnail(videoId) {
+    if (!audioModeOverlay) return;
+
+    const url = thumbnailUrl(videoId);
+    const overlay = audioModeOverlay;
+    if (!url) {
+        overlay.style.removeProperty('--em-thumb');
+        delete overlay.dataset.emThumb;
+        return;
+    }
+    if (overlay.dataset.emThumb === url) return;
+
+    overlay.dataset.emThumb = url;
+    overlay.style.setProperty('--em-thumb', `url("${url}")`);
+
+    const preload = new Image();
+    preload.onerror = () => {
+        // Only clear if the overlay still shows this thumbnail
+        if (overlay.dataset.emThumb === url) {
+            overlay.style.removeProperty('--em-thumb');
+        }
+    };
+    preload.src = url;
+}
+
+/**
+ * Refresh the overlay's title, channel and thumbnail for the current video
+ */
+function updateOverlayContent() {
+    if (!audioModeOverlay) return;
+
+    const info = getCurrentVideoInfo();
+    const title = audioModeOverlay.querySelector('.em-title');
+    const channel = audioModeOverlay.querySelector('.em-channel');
+
+    if (title) title.textContent = info?.videoTitle || '';
+    if (channel) channel.textContent = info?.channelName || '';
+
+    applyOverlayThumbnail(new URLSearchParams(window.location.search).get('v'));
+}
+
+/**
+ * Switch the overlay look, rebuilding the overlay if it is currently shown
+ * @param {*} look - Requested look (normalized)
+ */
+function setPlayerLook(look) {
+    const next = normalizePlayerLook(look);
+    if (next === currentPlayerLook) return;
+
+    currentPlayerLook = next;
+    console.log('[Audio Mode] Player look changed:', currentPlayerLook);
+
+    if (audioModeOverlay) {
+        createAudioModeOverlay();
+    }
+}
+
+/**
+ * Remove the overlay's play/pause listeners from the video element
+ */
+function detachOverlayVideoListeners() {
+    const video = getVideoElement();
+    if (!video) return;
+
+    if (videoPlayHandler) {
+        video.removeEventListener('play', videoPlayHandler);
+        videoPlayHandler = null;
+    }
+    if (videoPauseHandler) {
+        video.removeEventListener('pause', videoPauseHandler);
+        videoPauseHandler = null;
+    }
+}
+
 async function createAudioModeOverlay() {
     // Ensure messages are loaded for current language
     await loadMessages(currentLanguage);
@@ -1486,7 +1719,9 @@ async function createAudioModeOverlay() {
     // Remove existing overlay if any
     if (audioModeOverlay) {
         audioModeOverlay.remove();
+        audioModeOverlay = null;
     }
+    detachOverlayVideoListeners();
 
     // Find the video container
     const videoContainer = document.querySelector('.html5-video-container') ||
@@ -1494,23 +1729,14 @@ async function createAudioModeOverlay() {
 
     if (!videoContainer) return;
 
-    // Create overlay element
+    // Create overlay element (built with createElement only: titles are untrusted page data)
+    const look = normalizePlayerLook(currentPlayerLook);
     audioModeOverlay = document.createElement('div');
     audioModeOverlay.id = 'youtube-audio-mode-overlay';
-    audioModeOverlay.innerHTML = `
-    <div class="audio-mode-content">
-      <h2 id="am-overlay-title">${t('activeTitle')}</h2>
-      <p id="am-overlay-desc">${t('activeDesc')}</p>
-      <div class="audio-visualizer">
-        <span class="bar"></span>
-        <span class="bar"></span>
-        <span class="bar"></span>
-        <span class="bar"></span>
-        <span class="bar"></span>
-      </div>
-    </div >
-        `;
-
+    audioModeOverlay.className = `earmode-look-${look}`;
+    for (const child of buildOverlayLook(look)) {
+        audioModeOverlay.appendChild(child);
+    }
 
     // CSS is now loaded from overlay.css via manifest.json
     // No need to inject styles dynamically
@@ -1526,6 +1752,9 @@ async function createAudioModeOverlay() {
     if (currentLanguage === 'ar') {
         audioModeOverlay.setAttribute('dir', 'rtl');
     }
+
+    // Fill in title, channel and thumbnail
+    updateOverlayContent();
 
     // Apply saved theme
     // Safety check: Stop if extension context is invalidated
@@ -1545,20 +1774,20 @@ async function createAudioModeOverlay() {
 
     // Add play/pause listeners to control animation
     const video = getVideoElement();
-    const visualizer = audioModeOverlay.querySelector('.audio-visualizer');
+    const overlay = audioModeOverlay;
 
-    if (video && visualizer) {
+    if (video) {
         // Set initial state
         if (video.paused) {
-            visualizer.classList.add('paused');
+            overlay.classList.add('paused');
         }
 
         // Create named handlers for cleanup
         videoPlayHandler = () => {
-            visualizer.classList.remove('paused');
+            overlay.classList.remove('paused');
         };
         videoPauseHandler = () => {
-            visualizer.classList.add('paused');
+            overlay.classList.add('paused');
         };
 
         // Listen for play/pause events
@@ -1567,6 +1796,12 @@ async function createAudioModeOverlay() {
     }
 }
 
+/**
+ * Apply the user's background to the overlay.
+ * Colours go into --em-bg (used by the solid looks and as the thumbnail fallback).
+ * @param {string} type - 'color' or 'image'
+ * @param {string} value - Colour or image URL
+ */
 function updateOverlayTheme(type, value) {
     if (!audioModeOverlay) return;
 
@@ -1574,10 +1809,12 @@ function updateOverlayTheme(type, value) {
     if (!value) value = '#172554';
 
     if (type === 'image') {
+        audioModeOverlay.style.removeProperty('--em-bg');
         audioModeOverlay.style.background = `url("${value}") no-repeat center center / cover`;
         audioModeOverlay.classList.add('has-image');
     } else {
-        audioModeOverlay.style.background = value;
+        audioModeOverlay.style.removeProperty('background');
+        audioModeOverlay.style.setProperty('--em-bg', value);
         audioModeOverlay.classList.remove('has-image');
     }
 }
@@ -1589,11 +1826,8 @@ async function updateOverlayLanguage() {
 
     // If overlay exists, update its text content only (don't recreate)
     if (audioModeOverlay) {
-        const title = audioModeOverlay.querySelector('#am-overlay-title');
-        const desc = audioModeOverlay.querySelector('#am-overlay-desc');
-
-        if (title) title.textContent = t('activeTitle');
-        if (desc) desc.textContent = t('activeDesc');
+        const kicker = audioModeOverlay.querySelector('.em-kicker');
+        if (kicker) kicker.textContent = t('overlayListening');
 
         // Update RTL direction
         if (currentLanguage === 'ar') {
@@ -1655,6 +1889,7 @@ document.addEventListener('yt-navigate-finish', () => {
 
     // Small delay to ensure video player is ready
     setTimeout(() => {
+        updateOverlayContent();
         scheduleModeLogic('yt-navigate-finish', 100);
     }, 300);
 });
@@ -1715,6 +1950,9 @@ document.addEventListener('yt-navigate-finish', () => {
 document.addEventListener('yt-page-data-updated', () => {
     if (!isOnVideoPage()) return;
     console.log('[Audio Mode] yt-page-data-updated event fired');
+
+    // Title and channel are reliable by now; refresh the overlay text
+    updateOverlayContent();
 
     // Check if video ID changed (for playlist navigation)
     const currentVideoId = new URLSearchParams(window.location.search).get('v');

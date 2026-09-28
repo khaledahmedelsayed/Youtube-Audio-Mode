@@ -123,13 +123,9 @@
         "message": " ميجا",
         "description": "Data unit: megabytes"
     },
-    "activeTitle": {
-        "message": "وضع الصوت مفعل",
-        "description": "Overlay title when audio mode is active"
-    },
-    "activeDesc": {
-        "message": "نقوم بتوفير باقتك",
-        "description": "Overlay description when audio mode is active"
+    "overlayListening": {
+        "message": "استماع",
+        "description": "Overlay label shown above the video title in audio mode"
     },
     "filterRules": {
         "message": "قواعد التصفية",

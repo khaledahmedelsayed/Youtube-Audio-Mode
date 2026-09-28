@@ -55,7 +55,7 @@ let modeApplyGeneration = 0;
 let modeApplyInProgress = false;
 let modeApplyQueued = false;
 let manualOverride = null; // { videoId, audio } - per-video manual switch
-let lastDecision = { audio: false, reason: 'none' };
+let lastDecision = { audio: false, reason: 'none' }; // last auto (non-manual) decision
 
 // Overlay ("player look") state
 const PLAYER_LOOKS = ['card', 'blur', 'minimal', 'waves'];
@@ -281,7 +281,7 @@ function getEarmodeStatus() {
     return {
         onVideo: isOnVideoPage(),
         audio: audioModeEnabled,
-        reason: lastDecision.reason,
+        reason: getActiveOverride() !== null ? 'manual' : lastDecision.reason,
         mode: currentModeType,
         override: getActiveOverride()
     };
@@ -303,6 +303,10 @@ function setVideoAudio(audio) {
  */
 function clearOverride() {
     manualOverride = null;
+    // Filtered mode keeps its last list decision until the page is checked again
+    if (currentModeType !== 'filtered') {
+        lastDecision = decideAudio({ override: null, mode: currentModeType, inList: false });
+    }
     emitEarmodeState();
     scheduleModeLogic('back to auto', 0);
 }
@@ -320,8 +324,7 @@ async function applyModeLogic(generation = modeApplyGeneration) {
     // A manual switch for this video wins - no need to scrape the page
     const override = getActiveOverride();
     if (override !== null) {
-        lastDecision = decideAudio({ override, mode: currentModeType, inList: false });
-        applyDecision(lastDecision);
+        applyDecision(decideAudio({ override, mode: currentModeType, inList: false }));
         return;
     }
 

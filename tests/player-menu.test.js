@@ -204,14 +204,13 @@ test('switch sets the video audio and ignores the active automatic side', () => 
     audioOpt.dispatch('click');
     assert.equal(api.getEarmodeStatus().override, true);
     ctx.renderPlayerMenu();
-    assert.equal(menuOf(player).querySelector('.em-pm-back').hidden, true); // reason still auto until logic runs
+    assert.equal(menuOf(player).querySelector('.em-pm-back').hidden, false); // manual pick shows right away
 });
 
 test('back to auto shows for manual picks and clears the override', () => {
-    const { api, ctx, player, run } = setupMenu();
+    const { api, ctx, player } = setupMenu();
     ctx.ensurePlayerMenu();
     api.setVideoAudio(true);
-    run("lastDecision = { audio: true, reason: 'manual' }");
     ctx.renderPlayerMenu();
     const back = menuOf(player).querySelector('.em-pm-back');
     assert.equal(back.hidden, false);

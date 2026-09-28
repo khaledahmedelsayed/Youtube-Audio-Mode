@@ -158,3 +158,49 @@ test('no earmodeState broadcast when the extension context is gone', () => {
     api.setVideoAudio(true);
     assert.equal(api.getSentRuntimeMessagesForTest().length, 0);
 });
+
+test('status reason is manual right after setVideoAudio, before mode logic runs', () => {
+    const api = loadContentScript(createTimers());
+    api.setRuntimeIdForTest('ext');
+    api.setVideoAudio(true);
+
+    assert.equal(api.getEarmodeStatus().reason, 'manual');
+    const sent = plain(api.getSentRuntimeMessagesForTest());
+    assert.equal(sent[sent.length - 1].status.reason, 'manual');
+});
+
+test('status reason is not a stale manual right after clearOverride', async () => {
+    const timers = createTimers();
+    const api = loadContentScript(timers);
+    api.stubAudioPathsForTest();
+    api.setRuntimeIdForTest('ext');
+    api.setModeForTest('always');
+
+    api.setVideoAudio(false);
+    await settle(timers);
+    assert.equal(api.getEarmodeStatus().reason, 'manual');
+
+    api.clearOverride();
+    assert.equal(api.getEarmodeStatus().reason, 'all');
+    const sent = plain(api.getSentRuntimeMessagesForTest());
+    assert.equal(sent[sent.length - 1].status.reason, 'all');
+});
+
+test('clearOverride in filtered mode keeps the last list decision', async () => {
+    const timers = createTimers();
+    const api = loadContentScript(timers);
+    api.stubAudioPathsForTest();
+    api.setRuntimeIdForTest('test-extension');
+    api.setModeForTest('filtered');
+
+    api.applyFilteredMode();
+    await settle(timers, 40);
+    assert.equal(api.getEarmodeStatus().reason, 'notInList');
+
+    api.setVideoAudio(true);
+    await settle(timers);
+    assert.equal(api.getEarmodeStatus().reason, 'manual');
+
+    api.clearOverride();
+    assert.equal(api.getEarmodeStatus().reason, 'notInList');
+});

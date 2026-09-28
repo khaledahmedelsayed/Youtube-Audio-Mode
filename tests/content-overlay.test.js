@@ -93,9 +93,8 @@ class FakeElement {
     }
 }
 
-function setupOverlayDom(api, { title = 'Song <b>title</b>', search = '?v=dQw4w9WgXcQ' } = {}) {
-    const container = new FakeElement('div');
-    const video = {
+function createFakeVideo() {
+    return {
         paused: true,
         listeners: { play: [], pause: [] },
         addEventListener(type, fn) {
@@ -105,6 +104,12 @@ function setupOverlayDom(api, { title = 'Song <b>title</b>', search = '?v=dQw4w9
             this.listeners[type] = this.listeners[type].filter(listener => listener !== fn);
         }
     };
+}
+
+function setupOverlayDom(api, { title = 'Song <b>title</b>', search = '?v=dQw4w9WgXcQ', h1 = null, enabled = true } = {}) {
+    const container = new FakeElement('div');
+    const dom = { video: createFakeVideo(), h1 };
+    api.setAudioModeEnabled(enabled);
     api.setDocumentForTest({
         title: `${title} - YouTube`,
         body: {},
@@ -113,7 +118,8 @@ function setupOverlayDom(api, { title = 'Song <b>title</b>', search = '?v=dQw4w9
         createElementNS: (ns, tag) => new FakeElement(tag, ns),
         querySelector(selector) {
             if (selector === '.html5-video-container') return container;
-            if (selector === 'video') return video;
+            if (selector === 'video') return dom.video;
+            if (selector === 'ytd-watch-metadata h1 yt-formatted-string' && dom.h1) return { textContent: dom.h1 };
             return null;
         },
         querySelectorAll: () => [],
@@ -121,7 +127,7 @@ function setupOverlayDom(api, { title = 'Song <b>title</b>', search = '?v=dQw4w9
         dispatchEvent() {}
     });
     api.setSearchForTest(search);
-    return { container, video };
+    return { container, video: dom.video, dom };
 }
 
 const classesOf = el => [...el.walk()].map(child => child.className).filter(Boolean);
@@ -185,4 +191,69 @@ test('rebuilding the overlay does not stack play/pause listeners', async () => {
 
     video.listeners.play[0]();
     assert.equal(api.getOverlayForTest().classList.contains('paused'), false);
+});
+
+test('a pending rebuild does not bring the overlay back after disable', async () => {
+    const api = loadContentScript(createTimers());
+    const { container } = setupOverlayDom(api, { enabled: false });
+    await api.createAudioModeOverlay();
+    assert.equal(api.getOverlayForTest(), null);
+    assert.equal(container.children.length, 0);
+});
+
+test('video title drops the YouTube notification count', () => {
+    const api = loadContentScript(createTimers());
+    setupOverlayDom(api, { title: '(3) Song title' });
+    assert.equal(api.getCurrentVideoInfo().videoTitle, 'Song title');
+});
+
+test('overlay prefers the watch page heading for the title', async () => {
+    const api = loadContentScript(createTimers());
+    const { dom } = setupOverlayDom(api, { title: 'Old title', h1: '  New title  ' });
+    await api.createAudioModeOverlay();
+    assert.equal(api.getOverlayForTest().querySelector('.em-title').textContent, 'New title');
+
+    dom.h1 = null;
+    api.updateOverlayContent();
+    assert.equal(api.getOverlayForTest().querySelector('.em-title').textContent, 'Old title');
+});
+
+test('listeners are detached from the video they were attached to', async () => {
+    const api = loadContentScript(createTimers());
+    const { dom } = setupOverlayDom(api);
+    await api.createAudioModeOverlay();
+    const firstVideo = dom.video;
+    dom.video = createFakeVideo();
+    api.clearVideoCacheForTest();
+
+    await api.createAudioModeOverlay();
+    assert.equal(firstVideo.listeners.play.length, 0);
+    assert.equal(firstVideo.listeners.pause.length, 0);
+    assert.equal(dom.video.listeners.play.length, 1);
+});
+
+test('YouTube placeholder thumbnail counts as missing', async () => {
+    const api = loadContentScript(createTimers());
+    const images = [];
+    api.setImageForTest(class {
+        constructor() {
+            images.push(this);
+        }
+    });
+    setupOverlayDom(api);
+    await api.createAudioModeOverlay();
+    const overlay = api.getOverlayForTest();
+    assert.ok(overlay.style.props['--em-thumb']);
+
+    images[0].naturalWidth = 120;
+    images[0].onload();
+    assert.equal(overlay.style.props['--em-thumb'], undefined);
+});
+
+test('image background also feeds --em-bg', async () => {
+    const api = loadContentScript(createTimers());
+    setupOverlayDom(api);
+    await api.createAudioModeOverlay();
+    api.updateOverlayTheme('image', 'https://example.com/a.png');
+    assert.equal(api.getOverlayForTest().style.props['--em-bg'], 'url("https://example.com/a.png")');
 });

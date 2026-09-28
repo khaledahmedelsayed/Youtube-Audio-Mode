@@ -137,6 +137,13 @@ globalThis.__audioModeTestApi = {
     setPlayerLook,
     updateOverlayTheme,
     updateOverlayContent,
+    getCurrentVideoInfo,
+    setImageForTest(ImageClass) {
+        globalThis.Image = ImageClass;
+    },
+    clearVideoCacheForTest() {
+        clearVideoCache();
+    },
     getOverlayForTest() {
         return audioModeOverlay;
     },

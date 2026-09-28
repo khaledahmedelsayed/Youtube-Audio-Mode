@@ -41,6 +41,7 @@
   content: "";
   position: absolute;
   inset: 0;
+  z-index: 0;
   background: rgba(0, 0, 0, 0.6);
 }
 
@@ -73,6 +74,7 @@
   opacity: 0.8;
 }
 
+#youtube-audio-mode-overlay .em-title:empty,
 #youtube-audio-mode-overlay .em-channel:empty {
   display: none;
 }
@@ -90,6 +92,7 @@
   content: "";
   position: absolute;
   inset: -40px;
+  z-index: 0;
   background: var(--em-thumb, var(--em-bg)) center / cover no-repeat;
   filter: blur(28px) saturate(1.2);
 }
@@ -98,6 +101,7 @@
   content: "";
   position: absolute;
   inset: 0;
+  z-index: 0;
   background: rgba(12, 12, 16, 0.35);
 }
 
@@ -133,6 +137,7 @@
   content: "";
   position: absolute;
   inset: 0;
+  z-index: 0;
   background: linear-gradient(transparent 40%, rgba(0, 0, 0, 0.55));
 }
 
@@ -172,6 +177,7 @@
   width: 200%;
   height: 90px;
   margin-top: -45px;
+  z-index: 1;
   animation: em-drift 6s linear infinite;
 }
 
@@ -181,6 +187,7 @@
 
 #youtube-audio-mode-overlay.earmode-look-waves .em-ov-text {
   position: absolute;
+  z-index: 2;
   inset-inline: 20px;
   bottom: 22px;
   display: grid;

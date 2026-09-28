@@ -46,6 +46,7 @@ let cachedVideoElement = null;
 let currentLanguage = 'en';
 let videoPlayHandler = null;
 let videoPauseHandler = null;
+let overlayListenerVideo = null; // Video element the overlay play/pause handlers are attached to
 let lastAppliedVideoId = null;
 let currentModeType = 'always'; // 'always' or 'filtered'
 let savedQualityBeforeAudioMode = null; // Store user's quality to restore later
@@ -748,7 +749,8 @@ function getCurrentVideoInfo() {
         // Method 1: document.title (updates during SPA navigation)
         // Format: "Video Title - YouTube"
         if (document.title && document.title !== 'YouTube') {
-            videoTitle = document.title.replace(/ - YouTube$/, '').trim();
+            // Strip the "(3) " notification count YouTube prefixes when there are unread notifications
+            videoTitle = document.title.replace(/ - YouTube$/, '').replace(/^\(\d+\)\s*/, '').trim();
         }
 
         // Method 2: Modern YouTube layout h1 selectors
@@ -957,17 +959,8 @@ function disableAudioMode(fromAutoRule = false) {
     // Reset YouTube's settings UI styles (uses the resetSettingsUIStyles function)
     resetSettingsUIStyles();
 
-    // Clean up video event listeners (reuse video from above)
-    if (video) {
-        if (videoPlayHandler) {
-            video.removeEventListener('play', videoPlayHandler);
-            videoPlayHandler = null;
-        }
-        if (videoPauseHandler) {
-            video.removeEventListener('pause', videoPauseHandler);
-            videoPauseHandler = null;
-        }
-    }
+    // Clean up overlay play/pause listeners
+    detachOverlayVideoListeners();
 
     // Remove overlay
     if (audioModeOverlay) {
@@ -1654,11 +1647,16 @@ function applyOverlayThumbnail(videoId) {
     overlay.style.setProperty('--em-thumb', `url("${url}")`);
 
     const preload = new Image();
-    preload.onerror = () => {
+    const dropThumbnail = () => {
         // Only clear if the overlay still shows this thumbnail
         if (overlay.dataset.emThumb === url) {
             overlay.style.removeProperty('--em-thumb');
         }
+    };
+    preload.onerror = dropThumbnail;
+    preload.onload = () => {
+        // YouTube serves a 120px wide grey placeholder for missing thumbnails
+        if (preload.naturalWidth === 120) dropThumbnail();
     };
     preload.src = url;
 }
@@ -1673,7 +1671,11 @@ function updateOverlayContent() {
     const title = audioModeOverlay.querySelector('.em-title');
     const channel = audioModeOverlay.querySelector('.em-channel');
 
-    if (title) title.textContent = info?.videoTitle || '';
+    // The watch page heading updates with the new video; document.title can lag behind
+    const heading = document.querySelector('ytd-watch-metadata h1 yt-formatted-string');
+    const headingTitle = heading?.textContent?.trim();
+
+    if (title) title.textContent = headingTitle || info?.videoTitle || '';
     if (channel) channel.textContent = info?.channelName || '';
 
     applyOverlayThumbnail(new URLSearchParams(window.location.search).get('v'));
@@ -1691,7 +1693,9 @@ function setPlayerLook(look) {
     console.log('[Audio Mode] Player look changed:', currentPlayerLook);
 
     if (audioModeOverlay) {
-        createAudioModeOverlay();
+        createAudioModeOverlay().catch(error => {
+            console.log('[Audio Mode] Could not rebuild overlay:', error);
+        });
     }
 }
 
@@ -1699,22 +1703,26 @@ function setPlayerLook(look) {
  * Remove the overlay's play/pause listeners from the video element
  */
 function detachOverlayVideoListeners() {
-    const video = getVideoElement();
+    const video = overlayListenerVideo;
+    overlayListenerVideo = null;
     if (!video) return;
 
     if (videoPlayHandler) {
         video.removeEventListener('play', videoPlayHandler);
-        videoPlayHandler = null;
     }
     if (videoPauseHandler) {
         video.removeEventListener('pause', videoPauseHandler);
-        videoPauseHandler = null;
     }
+    videoPlayHandler = null;
+    videoPauseHandler = null;
 }
 
 async function createAudioModeOverlay() {
     // Ensure messages are loaded for current language
     await loadMessages(currentLanguage);
+
+    // Audio mode may have been turned off while messages were loading
+    if (!audioModeEnabled) return;
 
     // Remove existing overlay if any
     if (audioModeOverlay) {
@@ -1793,6 +1801,7 @@ async function createAudioModeOverlay() {
         // Listen for play/pause events
         video.addEventListener('play', videoPlayHandler);
         video.addEventListener('pause', videoPauseHandler);
+        overlayListenerVideo = video;
     }
 }
 
@@ -1809,7 +1818,8 @@ function updateOverlayTheme(type, value) {
     if (!value) value = '#172554';
 
     if (type === 'image') {
-        audioModeOverlay.style.removeProperty('--em-bg');
+        // Card and blur fall back to the user image when there is no thumbnail
+        audioModeOverlay.style.setProperty('--em-bg', `url("${value}")`);
         audioModeOverlay.style.background = `url("${value}") no-repeat center center / cover`;
         audioModeOverlay.classList.add('has-image');
     } else {
@@ -1892,6 +1902,9 @@ document.addEventListener('yt-navigate-finish', () => {
         updateOverlayContent();
         scheduleModeLogic('yt-navigate-finish', 100);
     }, 300);
+
+    // Catch titles that were still stale at the first refresh
+    setTimeout(updateOverlayContent, 1000);
 });
 
 // Also listen for video element becoming ready

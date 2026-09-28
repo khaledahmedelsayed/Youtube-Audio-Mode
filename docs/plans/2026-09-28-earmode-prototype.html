@@ -1,0 +1,446 @@
+<title>Earmode Popup Prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600&family=Nunito+Sans:opsz,wght@6..12,400;6..12,600;6..12,700&family=Cairo:wght@400;600;700&display=swap">
+<style>
+:root {
+  --ground: #E9EAF0;
+  --surface: #FFFFFF;
+  --surface-2: #F1F1F6;
+  --ink: #1C1B22;
+  --ink-soft: #5E5D6B;
+  --line: #DCDCE5;
+  --sun: #F2C14E;
+  --sun-ink: #3A2C05;
+  --leaf: #2F8F5B;
+  --knob-video: #1C1B22;
+  --knob-video-ink: #FFFFFF;
+  --shadow: 0 1px 2px rgba(28,27,34,.06), 0 12px 32px rgba(28,27,34,.10);
+  --display: "Fredoka", "Cairo", ui-rounded, "Segoe UI", system-ui, sans-serif;
+  --body: "Nunito Sans", "Cairo", "Segoe UI", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --ground: #111116; --surface: #1D1C24; --surface-2: #272630; --ink: #EDECF3;
+    --ink-soft: #A3A2B2; --line: #33323E; --sun: #F2C14E; --sun-ink: #2A1F02;
+    --leaf: #5BC48A; --knob-video: #EDECF3; --knob-video-ink: #1C1B22;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 12px 32px rgba(0,0,0,.45);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ground: #111116; --surface: #1D1C24; --surface-2: #272630; --ink: #EDECF3;
+  --ink-soft: #A3A2B2; --line: #33323E; --sun: #F2C14E; --sun-ink: #2A1F02;
+  --leaf: #5BC48A; --knob-video: #EDECF3; --knob-video-ink: #1C1B22;
+  --shadow: 0 1px 2px rgba(0,0,0,.4), 0 12px 32px rgba(0,0,0,.45);
+}
+* { box-sizing: border-box; }
+body { background: var(--ground); color: var(--ink); font-family: var(--body); font-size: 14px; }
+.page { max-width: 1000px; margin: 0 auto; padding: 32px 16px 48px; display: grid; gap: 24px; }
+.intro h1 { font-family: var(--display); font-weight: 600; font-size: 26px; margin: 0 0 6px; text-wrap: balance; }
+.intro p { margin: 0; color: var(--ink-soft); max-width: 64ch; line-height: 1.5; }
+
+.controls { display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center; }
+.controls .group { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.label { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-soft); }
+.chip { border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 999px; padding: 6px 12px; font: 600 13px var(--body); cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+
+.stage { display: grid; grid-template-columns: 340px 1fr; gap: 28px; align-items: start; }
+@media (max-width: 780px) { .stage { grid-template-columns: 1fr; } }
+.caption { margin: 0 0 8px; }
+
+/* ---------- popup ---------- */
+.popup { width: 100%; max-width: 340px; background: var(--surface); border-radius: 18px; box-shadow: var(--shadow); padding: 16px; display: grid; gap: 16px; }
+.popup[dir="rtl"], .menu[dir="rtl"] { font-family: "Cairo", var(--body); }
+.bar { display: flex; align-items: center; gap: 8px; }
+.brand { display: flex; align-items: center; gap: 8px; font-family: var(--display); font-weight: 600; font-size: 18px; margin-inline-end: auto; }
+.icon-btn { width: 32px; height: 32px; border-radius: 10px; border: 0; background: var(--surface-2); color: var(--ink); display: grid; place-items: center; cursor: pointer; font: 700 14px "Cairo", sans-serif; }
+
+/* the big two-way switch */
+.switch { position: relative; display: grid; grid-template-columns: 1fr 1fr; background: var(--surface-2); border-radius: 22px; padding: 5px; box-shadow: inset 0 0 0 1px var(--line); }
+.switch .knob { position: absolute; top: 5px; bottom: 5px; inset-inline-start: 5px; width: calc(50% - 5px); border-radius: 17px; background: var(--knob-video); transition: transform .28s cubic-bezier(.3,.7,.2,1), background .28s; box-shadow: 0 4px 14px rgba(0,0,0,.18); }
+.switch[data-on="true"] .knob { background: var(--sun); transform: translateX(100%); }
+.popup[dir="rtl"] .switch[data-on="true"] .knob { transform: translateX(-100%); }
+.switch button { position: relative; z-index: 1; border: 0; background: none; cursor: pointer; display: grid; justify-items: center; gap: 2px; padding: 14px 6px 12px; color: var(--ink-soft); font-family: inherit; border-radius: 17px; transition: color .2s; }
+.switch button b { font: 600 18px var(--display); }
+.switch[dir] button b, .popup[dir="rtl"] .switch button b { font-family: "Cairo", var(--display); }
+.switch button small { font-size: 11px; font-weight: 600; opacity: .85; }
+.switch[data-on="false"] .opt-video { color: var(--knob-video-ink); }
+.switch[data-on="true"] .opt-audio { color: var(--sun-ink); }
+.switch:has(button:disabled) { opacity: .55; }
+.switch button:disabled { cursor: default; }
+.switch[data-disabled="true"] .knob { opacity: 0; }
+
+.state { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--ink-soft); flex-wrap: wrap; margin-top: -6px; }
+.state .pill { font-weight: 700; color: var(--ink); background: var(--surface-2); border-radius: 999px; padding: 2px 8px; }
+.state button { background: none; border: 0; color: var(--ink); text-decoration: underline; font: 600 12px inherit; font-family: inherit; cursor: pointer; padding: 0; margin-inline-start: auto; }
+.empty { text-align: center; color: var(--ink-soft); font-size: 13px; padding-block: 6px; }
+
+.channel { border: 1px solid var(--line); border-radius: 14px; padding: 12px; display: flex; align-items: center; gap: 10px; }
+.avatar { width: 34px; height: 34px; border-radius: 50%; flex: none; display: grid; place-items: center; font-weight: 700; color: #fff; font-size: 14px; }
+.who { display: grid; margin-inline-end: auto; min-width: 0; }
+.who b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.who small { color: var(--ink-soft); font-size: 12px; }
+.add { border: 0; border-radius: 999px; padding: 7px 12px; font: 700 12px var(--body); font-family: inherit; cursor: pointer; background: var(--ink); color: var(--surface); white-space: nowrap; }
+.add[data-in="true"] { background: var(--surface-2); color: var(--ink); }
+
+.block { display: grid; gap: 6px; }
+.block > .title { font-size: 12px; font-weight: 700; color: var(--ink-soft); }
+.seg { display: grid; grid-template-columns: repeat(3, 1fr); background: var(--surface-2); border-radius: 12px; padding: 3px; }
+.seg button { border: 0; background: none; border-radius: 9px; padding: 8px 4px; font: 600 13px inherit; font-family: inherit; color: var(--ink-soft); cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,.14); }
+.hint { font-size: 12px; color: var(--ink-soft); }
+
+.looks { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.look { border: 2px solid transparent; background: none; padding: 0; cursor: pointer; display: grid; gap: 4px; font: 600 11px inherit; font-family: inherit; color: var(--ink-soft); border-radius: 10px; }
+.look .sw { aspect-ratio: 16/10; border-radius: 8px; overflow: hidden; position: relative; background: #15151b; }
+.look[aria-pressed="true"] { color: var(--ink); }
+.look[aria-pressed="true"] .sw { box-shadow: 0 0 0 2px var(--sun); }
+.sw-card::before { content: ""; position: absolute; inset: 0; background: linear-gradient(135deg,#1d3b8f,#3b82f6 50%,#f59e0b); filter: blur(4px); opacity: .8; }
+.sw-card::after { content: ""; position: absolute; left: 22%; right: 22%; top: 30%; bottom: 30%; background: rgba(20,20,26,.7); border-radius: 4px; }
+.sw-blur { background: linear-gradient(135deg,#1d3b8f,#3b82f6 50%,#f59e0b) !important; filter: saturate(.9); }
+.sw-blur::after { content: ""; position: absolute; left: 30%; right: 30%; top: 44%; height: 3px; background: rgba(255,255,255,.85); border-radius: 2px; }
+.sw-minimal::after { content: ""; position: absolute; left: 50%; top: 50%; width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 50%; border: 2px solid var(--sun); }
+.sw-waves::after { content: ""; position: absolute; left: 10%; right: 10%; top: 45%; height: 8px; background: repeating-linear-gradient(90deg, var(--sun) 0 3px, transparent 3px 6px); border-radius: 2px; }
+
+.stats { display: flex; align-items: center; gap: 8px; border: 0; background: none; padding: 0; color: var(--ink); font: 600 13px inherit; font-family: inherit; cursor: pointer; text-align: start; }
+.stats .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--leaf); flex: none; }
+.stats .num { font-variant-numeric: tabular-nums; color: var(--leaf); }
+.stats .go { margin-inline-start: auto; color: var(--ink-soft); }
+
+/* ---------- player ---------- */
+.player-wrap { position: relative; }
+.player { position: relative; aspect-ratio: 16/9; max-width: 100%; border-radius: 14px; overflow: hidden; background: #000; box-shadow: var(--shadow); }
+.layer { position: absolute; inset: 0; }
+.video { display: grid; place-items: center; color: rgba(255,255,255,.8); font: 600 13px var(--body); }
+.video::before { content: ""; position: absolute; inset: 0; background: var(--thumb); }
+.video span { position: relative; background: rgba(0,0,0,.45); padding: 4px 10px; border-radius: 999px; }
+
+.ov { display: grid; place-items: center; padding: 16px; color: #fff; overflow: hidden; }
+.ov-card::before, .ov-blur::before { content: ""; position: absolute; inset: -40px; background: var(--thumb); filter: blur(28px) saturate(1.2); }
+.ov-card::after { content: ""; position: absolute; inset: 0; background: rgba(12,12,16,.35); }
+.np-card { position: relative; z-index: 1; display: flex; align-items: center; gap: 16px; background: rgba(20,20,26,.55); backdrop-filter: blur(6px); border-radius: 16px; padding: 14px 18px 14px 14px; max-width: 88%; }
+.np-art { width: 72px; height: 72px; border-radius: 12px; background: var(--thumb); flex: none; box-shadow: 0 6px 18px rgba(0,0,0,.35); }
+.np-meta { display: grid; gap: 3px; min-width: 0; }
+.kicker { font: 700 10px var(--body); letter-spacing: .12em; text-transform: uppercase; color: var(--sun); }
+.np-meta b, .ov-text b { font: 600 16px var(--display); line-height: 1.25; overflow-wrap: anywhere; }
+.np-meta span, .ov-text span { font-size: 13px; opacity: .8; }
+.ov-blur::after { content: ""; position: absolute; inset: 0; background: linear-gradient(transparent 40%, rgba(0,0,0,.55)); }
+.ov-blur .ov-text { position: absolute; left: 20px; right: 20px; bottom: 22px; z-index: 1; display: grid; gap: 2px; }
+.ov-minimal { background: #16151c; }
+.ov-minimal .ov-text { display: grid; justify-items: center; gap: 8px; text-align: center; }
+.ov-minimal .ring { width: 64px; height: 64px; border-radius: 50%; border: 3px solid var(--sun); display: grid; place-items: center; color: var(--sun); }
+.ov-waves { background: #16151c; }
+.ov-waves svg { position: absolute; left: 0; top: 50%; width: 200%; height: 90px; margin-top: -45px; animation: drift 6s linear infinite; }
+.ov-waves .ov-text { position: absolute; left: 20px; bottom: 22px; display: grid; gap: 2px; }
+@keyframes drift { to { transform: translateX(-50%); } }
+
+.player-bar { position: absolute; left: 0; right: 0; bottom: 0; height: 4px; background: rgba(255,255,255,.25); z-index: 2; }
+.player-bar i { display: block; height: 100%; width: 38%; background: #f00; }
+
+/* in-player Earmode button + menu */
+.em-btn { position: absolute; top: 12px; inset-inline-start: 12px; z-index: 5; display: flex; align-items: center; gap: 6px; border: 0; border-radius: 999px; padding: 6px 10px 6px 8px; background: rgba(15,15,20,.72); color: #fff; font: 700 12px var(--body); cursor: pointer; backdrop-filter: blur(6px); }
+.em-btn .led { width: 8px; height: 8px; border-radius: 50%; background: #8a8a96; }
+.em-btn[data-on="true"] .led { background: var(--sun); box-shadow: 0 0 0 3px rgba(242,193,78,.3); }
+.menu { position: absolute; top: 50px; inset-inline-start: 12px; z-index: 6; width: 268px; max-width: calc(100% - 24px); background: #1D1C24; color: #EDECF3; border-radius: 14px; padding: 12px; display: grid; gap: 12px; box-shadow: 0 16px 40px rgba(0,0,0,.45); --surface-2: #2A2933; --surface: #3A3946; --ink: #EDECF3; --ink-soft: #A9A8B8; --line: #3A3946; --knob-video: #EDECF3; --knob-video-ink: #1C1B22; }
+.menu .switch button { padding: 8px 4px; }
+.menu .switch button b { font-size: 14px; }
+.menu .switch button small { display: none; }
+.menu .look { color: #A9A8B8; }
+.menu .look[aria-pressed="true"] { color: #fff; }
+
+.notes { margin: 14px 0 0; padding-inline-start: 18px; color: var(--ink-soft); line-height: 1.55; max-width: 64ch; }
+.toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--ink); color: var(--surface); padding: 8px 14px; border-radius: 999px; font-weight: 600; font-size: 13px; z-index: 10; }
+button:focus-visible { outline: 3px solid var(--sun); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+
+<div class="page">
+  <header class="intro">
+    <h1>Earmode popup, clickable demo</h1>
+    <p>Version 2. The big switch always shows both choices. You can pick how the player looks while you listen. The Earmode button on the player opens the same controls inside YouTube.</p>
+  </header>
+
+  <div class="controls" role="group" aria-label="Demo controls">
+    <div class="group"><span class="label">You are on</span>
+      <button class="chip" id="sc-yehia" data-sc="yehia" aria-pressed="true">Yehia Tech video</button>
+      <button class="chip" id="sc-music" data-sc="music" aria-pressed="false">Music video</button>
+      <button class="chip" id="sc-home" data-sc="home" aria-pressed="false">YouTube home</button>
+    </div>
+    <div class="group"><span class="label">Language</span>
+      <button class="chip" id="lang-en" data-lang="en" aria-pressed="true">English</button>
+      <button class="chip" id="lang-ar" data-lang="ar" aria-pressed="false">العربية</button>
+    </div>
+  </div>
+
+  <div class="stage">
+    <section>
+      <p class="caption label" id="cap-popup">Popup</p>
+      <div class="popup" id="popup" dir="ltr">
+        <div class="bar">
+          <div class="brand">
+            <svg width="26" height="26" viewBox="0 0 32 32" aria-hidden="true">
+              <rect width="32" height="32" rx="9" fill="#1C1B22"/>
+              <path d="M10 19v-3a6 6 0 0 1 12 0v3" fill="none" stroke="#F2C14E" stroke-width="2.6" stroke-linecap="round"/>
+              <rect x="8" y="18" width="4.5" height="7" rx="2" fill="#F2C14E"/>
+              <rect x="19.5" y="18" width="4.5" height="7" rx="2" fill="#F2C14E"/>
+            </svg>
+            <span>Earmode</span>
+          </div>
+          <button class="icon-btn" id="lang-btn" title="Language">ع</button>
+          <button class="icon-btn" id="gear" title="Settings" aria-label="Settings">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+          </button>
+        </div>
+
+        <div class="switch" id="sw-popup" data-on="false"></div>
+        <div class="state" id="state"></div>
+
+        <div class="channel" id="channel">
+          <div class="avatar" id="avatar"></div>
+          <div class="who"><b id="ch-name"></b><small id="ch-sub"></small></div>
+          <button class="add" id="add" data-in="false"></button>
+        </div>
+
+        <div class="block">
+          <span class="title" id="auto-label"></span>
+          <div class="seg" id="seg-popup"></div>
+          <span class="hint" id="auto-hint"></span>
+        </div>
+
+        <div class="block">
+          <span class="title" id="look-label"></span>
+          <div class="looks" id="looks-popup"></div>
+        </div>
+
+        <button class="stats" id="stats">
+          <span class="dot"></span>
+          <span id="stats-text"></span>
+          <span class="go" aria-hidden="true" id="stats-go">›</span>
+        </button>
+      </div>
+    </section>
+
+    <section>
+      <p class="caption label" id="cap-player">YouTube player</p>
+      <div class="player-wrap" id="player-wrap">
+        <div class="player" id="player">
+          <div class="layer video" id="video"><span id="video-label"></span></div>
+          <div class="layer ov" id="ov" hidden></div>
+          <div class="player-bar"><i></i></div>
+        </div>
+        <button class="em-btn" id="em-btn" aria-expanded="false" aria-controls="menu" hidden>
+          <span class="led"></span><span id="em-text"></span>
+        </button>
+        <div class="menu" id="menu" hidden>
+          <div class="block"><span class="title" id="m-this"></span><div class="switch" id="sw-menu" data-on="false"></div></div>
+          <div class="block"><span class="title" id="m-auto"></span><div class="seg" id="seg-menu"></div></div>
+          <div class="block"><span class="title" id="m-look"></span><div class="looks" id="looks-menu"></div></div>
+        </div>
+      </div>
+      <ul class="notes" id="notes"></ul>
+    </section>
+  </div>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+(function () {
+  const T = {
+    en: {
+      cap: ['Popup', 'YouTube player'],
+      video: 'Video', audio: 'Audio', videoSub: 'Full picture', audioSub: '144p, saves data',
+      now: 'Now', nowAudio: 'Audio only', nowVideo: 'Video',
+      noVideo: 'Open a YouTube video to use the switch.',
+      whyAll: 'because Auto is set to Everything', whyList: 'because this channel is in your list',
+      whyNotList: 'because this channel is not in your list', whyNone: 'because Auto is set to Nothing',
+      whyManual: 'because you picked it for this video', reset: 'Back to auto',
+      subs: ' subscribers', always: '+ Always listen', inList: '✓ In your list',
+      autoLabel: 'Auto-listen for new videos', modes: ['Everything', 'My list', 'Nothing'],
+      hints: ['Every video starts as audio.', n => n === 1 ? '1 channel in your list.' : n + ' channels in your list.', 'Videos start as normal video.'],
+      lookLabel: 'Player look while listening', looks: ['Card', 'Blur', 'Simple', 'Waves'],
+      stats: 'Saved <span class="num">2.3 GB</span> this month',
+      added: 'Added to your list', removed: 'Removed from your list',
+      settings: 'Settings open in a full page', statsToast: 'Full stats open in a full page',
+      home: 'YouTube home page', kicker: 'Listening',
+      menuThis: 'This video', menuAuto: 'Auto-listen', menuLook: 'Player look',
+      notes: ['The big switch shows both choices. The colored side is what plays now. The line below it says why.', 'Click the Earmode button on the player. It opens the same controls inside YouTube, so you do not need the popup.', 'Pick a player look in the popup or on the player. The change shows at once.']
+    },
+    ar: {
+      cap: ['النافذة', 'مشغل يوتيوب'],
+      video: 'فيديو', audio: 'صوت', videoSub: 'الصورة كاملة', audioSub: '144p، يوفر البيانات',
+      now: 'الآن', nowAudio: 'صوت فقط', nowVideo: 'فيديو',
+      noVideo: 'افتح فيديو على يوتيوب لاستخدام المفتاح.',
+      whyAll: 'لأن التلقائي مضبوط على الكل', whyList: 'لأن هذه القناة في قائمتك',
+      whyNotList: 'لأن هذه القناة ليست في قائمتك', whyNone: 'لأن التلقائي مضبوط على لا شيء',
+      whyManual: 'لأنك اخترته لهذا الفيديو', reset: 'العودة للتلقائي',
+      subs: ' مشترك', always: '+ استمع دائمًا', inList: '✓ في قائمتك',
+      autoLabel: 'استماع تلقائي للفيديوهات الجديدة', modes: ['الكل', 'قائمتي', 'لا شيء'],
+      hints: ['كل فيديو يبدأ بالصوت.', n => n + ' قناة في قائمتك.', 'الفيديوهات تبدأ بالفيديو العادي.'],
+      lookLabel: 'شكل المشغل أثناء الاستماع', looks: ['بطاقة', 'ضبابي', 'بسيط', 'موجات'],
+      stats: 'وفّرت <span class="num">2.3 GB</span> هذا الشهر',
+      added: 'أُضيفت إلى قائمتك', removed: 'حُذفت من قائمتك',
+      settings: 'الإعدادات تفتح في صفحة كاملة', statsToast: 'الإحصاءات الكاملة تفتح في صفحة كاملة',
+      home: 'الصفحة الرئيسية ليوتيوب', kicker: 'استماع',
+      menuThis: 'هذا الفيديو', menuAuto: 'استماع تلقائي', menuLook: 'شكل المشغل',
+      notes: ['المفتاح الكبير يعرض الخيارين. الجانب الملون هو ما يعمل الآن. السطر تحته يقول السبب.', 'اضغط زر Earmode على المشغل. يفتح نفس الأدوات داخل يوتيوب.', 'اختر شكل المشغل من النافذة أو من المشغل. التغيير يظهر فورًا.']
+    }
+  };
+  const SCENES = {
+    yehia: { id: '@yehiatech', name: 'Yehia Tech', subs: '1.2M', title: 'Building a home server on a budget', color: '#3B6FD8', thumb: 'linear-gradient(135deg,#1d3b8f 0%,#3b82f6 45%,#f59e0b 100%)' },
+    music: { id: '@lofigirl', name: 'Lofi Girl', subs: '14M', title: 'lofi hip hop radio, beats to relax/study to', color: '#B4508C', thumb: 'linear-gradient(135deg,#4c1d59 0%,#b4508c 50%,#f9c784 100%)' },
+    home: null
+  };
+  const LOOKS = ['card', 'blur', 'minimal', 'waves'];
+  const MODES = ['all', 'list', 'none'];
+  const EAR = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 15v-3a8 8 0 0 1 16 0v3"/><rect x="3" y="14" width="5" height="7" rx="2"/><rect x="16" y="14" width="5" height="7" rx="2"/></svg>';
+  const EYE = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+
+  const s = { scene: 'yehia', lang: 'en', mode: 'list', list: new Set(['@yehiatech']), override: null, look: 'card', menu: false };
+  const $ = id => document.getElementById(id);
+  const esc = str => String(str).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+  function listening() {
+    const v = SCENES[s.scene];
+    if (!v) return false;
+    if (s.override !== null) return s.override;
+    return s.mode === 'all' || (s.mode === 'list' && s.list.has(v.id));
+  }
+  function why(t, v) {
+    if (s.override !== null) return t.whyManual;
+    if (s.mode === 'all') return t.whyAll;
+    if (s.mode === 'none') return t.whyNone;
+    return s.list.has(v.id) ? t.whyList : t.whyNotList;
+  }
+
+  let toastTimer;
+  function toast(msg) {
+    const el = $('toast'); el.textContent = msg; el.hidden = false;
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => { el.hidden = true; }, 1800);
+  }
+
+  // builders (render once, then update state attributes)
+  function buildSwitch(el, idp) {
+    el.innerHTML = '<span class="knob"></span>' +
+      '<button class="opt-video" id="' + idp + '-video" data-val="false">' + EYE + '<b></b><small></small></button>' +
+      '<button class="opt-audio" id="' + idp + '-audio" data-val="true">' + EAR + '<b></b><small></small></button>';
+    el.querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
+      const want = b.dataset.val === 'true';
+      s.override = want; render();
+    }));
+  }
+  function buildSeg(el, idp) {
+    el.innerHTML = MODES.map(m => '<button id="' + idp + '-' + m + '" data-mode="' + m + '"></button>').join('');
+    el.querySelectorAll('button').forEach(b => b.addEventListener('click', () => { s.mode = b.dataset.mode; render(); }));
+  }
+  function buildLooks(el, idp) {
+    el.innerHTML = LOOKS.map(l => '<button class="look" id="' + idp + '-' + l + '" data-look="' + l + '"><span class="sw sw-' + l + '"></span><span class="nm"></span></button>').join('');
+    el.querySelectorAll('button').forEach(b => b.addEventListener('click', () => { s.look = b.dataset.look; render(); }));
+  }
+  buildSwitch($('sw-popup'), 'swp'); buildSwitch($('sw-menu'), 'swm');
+  buildSeg($('seg-popup'), 'segp'); buildSeg($('seg-menu'), 'segm');
+  buildLooks($('looks-popup'), 'lkp'); buildLooks($('looks-menu'), 'lkm');
+
+  function paintSwitch(el, t, on, enabled) {
+    el.dataset.on = String(on);
+    el.dataset.disabled = String(!enabled);
+    const [bv, ba] = el.querySelectorAll('button');
+    bv.querySelector('b').textContent = t.video; bv.querySelector('small').textContent = t.videoSub;
+    ba.querySelector('b').textContent = t.audio; ba.querySelector('small').textContent = t.audioSub;
+    bv.disabled = ba.disabled = !enabled;
+    bv.setAttribute('aria-pressed', String(enabled && !on));
+    ba.setAttribute('aria-pressed', String(enabled && on));
+  }
+  function paintSeg(el, t) {
+    el.querySelectorAll('button').forEach((b, i) => { b.textContent = t.modes[i]; b.setAttribute('aria-pressed', String(s.mode === MODES[i])); });
+  }
+  function paintLooks(el, t) {
+    el.querySelectorAll('button').forEach((b, i) => { b.querySelector('.nm').textContent = t.looks[i]; b.setAttribute('aria-pressed', String(s.look === LOOKS[i])); });
+  }
+
+  function overlayHTML(t, v) {
+    const text = '<span class="kicker">' + esc(t.kicker) + '</span><b>' + esc(v.title) + '</b><span>' + esc(v.name) + '</span>';
+    if (s.look === 'card') return '<div class="np-card"><div class="np-art"></div><div class="np-meta">' + text + '</div></div>';
+    if (s.look === 'blur') return '<div class="ov-text">' + text + '</div>';
+    if (s.look === 'minimal') return '<div class="ov-text"><div class="ring">' + EAR + '</div>' + text + '</div>';
+    let d = 'M0 45';
+    for (let x = 0; x <= 2000; x += 50) d += ' Q' + (x + 25) + ' ' + (x % 100 ? 70 : 20) + ' ' + (x + 50) + ' 45';
+    return '<svg viewBox="0 0 2000 90" preserveAspectRatio="none" aria-hidden="true">' +
+      '<path d="' + d + '" fill="none" stroke="#F2C14E" stroke-width="3" opacity=".9"/>' +
+      '<path d="' + d + '" fill="none" stroke="#F2C14E" stroke-width="2" opacity=".35" transform="translate(25 6)"/></svg>' +
+      '<div class="ov-text">' + text + '</div>';
+  }
+
+  function render() {
+    const t = T[s.lang], v = SCENES[s.scene], on = listening(), dir = s.lang === 'ar' ? 'rtl' : 'ltr';
+    $('popup').dir = dir; $('popup').lang = s.lang;
+    $('menu').dir = dir; $('player-wrap').dir = dir;
+    $('cap-popup').textContent = t.cap[0]; $('cap-player').textContent = t.cap[1];
+    $('lang-btn').textContent = s.lang === 'ar' ? 'EN' : 'ع';
+
+    paintSwitch($('sw-popup'), t, on, !!v);
+    paintSwitch($('sw-menu'), t, on, !!v);
+
+    if (!v) {
+      $('state').innerHTML = '<span>' + esc(t.noVideo) + '</span>';
+      $('channel').hidden = true;
+    } else {
+      $('state').innerHTML = '<span class="pill">' + esc(on ? t.nowAudio : t.nowVideo) + '</span><span>' + esc(why(t, v)) + '</span>' +
+        (s.override !== null ? '<button id="reset">' + esc(t.reset) + '</button>' : '');
+      const r = $('reset'); if (r) r.addEventListener('click', () => { s.override = null; render(); });
+      $('channel').hidden = false;
+      $('avatar').textContent = v.name[0]; $('avatar').style.background = v.color;
+      $('ch-name').textContent = v.name; $('ch-sub').textContent = v.subs + t.subs;
+      const inList = s.list.has(v.id);
+      $('add').dataset.in = String(inList);
+      $('add').textContent = inList ? t.inList : t.always;
+    }
+
+    $('auto-label').textContent = t.autoLabel;
+    paintSeg($('seg-popup'), t); paintSeg($('seg-menu'), t);
+    const h = t.hints[MODES.indexOf(s.mode)];
+    $('auto-hint').textContent = typeof h === 'function' ? h(s.list.size) : h;
+    $('look-label').textContent = t.lookLabel;
+    paintLooks($('looks-popup'), t); paintLooks($('looks-menu'), t);
+    $('stats-text').innerHTML = t.stats;
+    $('stats-go').textContent = s.lang === 'ar' ? '‹' : '›';
+
+    // player
+    $('player').style.setProperty('--thumb', v ? v.thumb : 'linear-gradient(135deg,#222,#444)');
+    $('video-label').textContent = v ? v.title : t.home;
+    const ov = $('ov');
+    ov.hidden = !on; $('video').hidden = on;
+    if (on) { ov.className = 'layer ov ov-' + s.look; ov.innerHTML = overlayHTML(t, v); }
+
+    const em = $('em-btn');
+    em.hidden = !v;
+    em.dataset.on = String(on);
+    $('em-text').textContent = 'Earmode · ' + (on ? t.nowAudio : t.nowVideo);
+    em.setAttribute('aria-expanded', String(s.menu && !!v));
+    $('menu').hidden = !(s.menu && v);
+    $('m-this').textContent = t.menuThis; $('m-auto').textContent = t.menuAuto; $('m-look').textContent = t.menuLook;
+
+    $('notes').innerHTML = t.notes.map(n => '<li>' + esc(n) + '</li>').join('');
+    document.querySelectorAll('[data-sc]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.sc === s.scene)));
+    document.querySelectorAll('[data-lang]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.lang === s.lang)));
+  }
+
+  $('add').addEventListener('click', () => {
+    const v = SCENES[s.scene]; if (!v) return;
+    const t = T[s.lang];
+    if (s.list.has(v.id)) { s.list.delete(v.id); toast(t.removed); } else { s.list.add(v.id); toast(t.added); }
+    render();
+  });
+  $('em-btn').addEventListener('click', e => { e.stopPropagation(); s.menu = !s.menu; render(); });
+  $('menu').addEventListener('click', e => e.stopPropagation());
+  document.addEventListener('click', () => { if (s.menu) { s.menu = false; render(); } });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && s.menu) { s.menu = false; render(); $('em-btn').focus(); } });
+  document.querySelectorAll('[data-sc]').forEach(b => b.addEventListener('click', () => { s.scene = b.dataset.sc; s.override = null; render(); }));
+  document.querySelectorAll('[data-lang]').forEach(b => b.addEventListener('click', () => { s.lang = b.dataset.lang; render(); }));
+  $('lang-btn').addEventListener('click', () => { s.lang = s.lang === 'en' ? 'ar' : 'en'; render(); });
+  $('gear').addEventListener('click', () => toast(T[s.lang].settings));
+  $('stats').addEventListener('click', () => toast(T[s.lang].statsToast));
+  render();
+})();
+</script>

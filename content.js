@@ -17,6 +17,7 @@ const TIMING = {
     UI_INTERACTION_BASE: 300,
     UI_INTERACTION_STEP: 100,
     UI_INTERACTION_FINAL: 200,
+    QUALITY_RETRY_DELAY: 250,
     API_VERIFICATION_DELAY: 500
 };
 
@@ -30,6 +31,10 @@ const QUALITY = {
     TARGET: 'tiny',  // 144p
     FALLBACK: 'small',
     RESTORE: 'hd720' // 720p
+};
+
+const LOWEST_QUALITY_RETRY = {
+    MAX_ATTEMPTS: 3
 };
 
 // ===== STATE VARIABLES =====
@@ -439,6 +444,14 @@ function resetQualityAttemptFlag() {
     if (player) {
         delete player.__audioModeQualityAttempted;
     }
+}
+
+function isAudioModeQuality(quality) {
+    return quality === QUALITY.TARGET || quality === QUALITY.FALLBACK;
+}
+
+function getPlayerQuality(player) {
+    return player?.getPlaybackQuality ? player.getPlaybackQuality() : 'unknown';
 }
 
 /**
@@ -868,6 +881,39 @@ function disableAudioMode(fromAutoRule = false) {
 // Track current quality setting operation to cancel stale callbacks
 let currentQualityOperationId = 0;
 
+function createEscapeKeyEvent() {
+    return new KeyboardEvent('keydown', {
+        key: 'Escape',
+        code: 'Escape',
+        keyCode: 27,
+        which: 27,
+        bubbles: true,
+        cancelable: true
+    });
+}
+
+function dispatchEscapeKey(target) {
+    if (target?.dispatchEvent) {
+        target.dispatchEvent(createEscapeKeyEvent());
+    }
+}
+
+function isSettingsButtonExpanded(settingsButton) {
+    return settingsButton?.getAttribute?.('aria-expanded') === 'true';
+}
+
+function closeSettingsPopup() {
+    dispatchEscapeKey(document.activeElement);
+    dispatchEscapeKey(document);
+    dispatchEscapeKey(document.body);
+    dispatchEscapeKey(window);
+
+    const settingsButton = document.querySelector('.ytp-settings-button');
+    if (isSettingsButtonExpanded(settingsButton)) {
+        settingsButton.click();
+    }
+}
+
 /**
  * Reset YouTube player settings UI styles
  * Call this after any operation that might have hidden the settings panel
@@ -925,6 +971,7 @@ const clickQualitySetting = (video, targetText = '144p', onComplete = null) => {
             setTimeout(() => {
                 // Check if this operation is still valid
                 if (operationId !== currentQualityOperationId) {
+                    closeSettingsPopup();
                     resetSettingsUIStyles();
                     onComplete?.();
                     return;
@@ -940,6 +987,7 @@ const clickQualitySetting = (video, targetText = '144p', onComplete = null) => {
                     setTimeout(() => {
                         // Check if this operation is still valid
                         if (operationId !== currentQualityOperationId) {
+                            closeSettingsPopup();
                             resetSettingsUIStyles();
                             onComplete?.();
                             return;
@@ -970,21 +1018,13 @@ const clickQualitySetting = (video, targetText = '144p', onComplete = null) => {
                         setTimeout(() => {
                             // Check if this operation is still valid
                             if (operationId !== currentQualityOperationId) {
+                                closeSettingsPopup();
                                 resetSettingsUIStyles();
                                 onComplete?.();
                                 return;
                             }
 
-                            // Simulate Escape to close
-                            const escapeEvent = new KeyboardEvent('keydown', {
-                                key: 'Escape',
-                                code: 'Escape',
-                                keyCode: 27,
-                                which: 27,
-                                bubbles: true,
-                                cancelable: true
-                            });
-                            document.dispatchEvent(escapeEvent);
+                            closeSettingsPopup();
 
                             // Re-query and restore styles after a brief delay
                             setTimeout(() => {
@@ -1003,6 +1043,7 @@ const clickQualitySetting = (video, targetText = '144p', onComplete = null) => {
                     }, 300);
                 } else {
                     // No quality menu found, cleanup
+                    closeSettingsPopup();
                     resetSettingsUIStyles();
                     onComplete?.();
                 }
@@ -1013,6 +1054,7 @@ const clickQualitySetting = (video, targetText = '144p', onComplete = null) => {
         }
     } catch (error) {
         console.error('[Audio Mode] Error in invisible UI interaction:', error);
+        closeSettingsPopup();
         resetSettingsUIStyles();
         onComplete?.();
     }
@@ -1024,11 +1066,26 @@ const clickQualitySetting = (video, targetText = '144p', onComplete = null) => {
  * @param {HTMLVideoElement} video - The video element
  * @param {Function} onComplete - Optional callback when operation completes
  */
-const forceLowestQuality = (player, video, onComplete = null) => {
+const forceLowestQuality = (player, video, onComplete = null, options = {}) => {
+    const retryOptions = (options && typeof options === 'object') ? options : {};
+    const attempt = retryOptions.attempt || 1;
+    const clickQuality = retryOptions.clickQuality || clickQualitySetting;
+
     try {
+        if (!player || !video) {
+            onComplete?.();
+            return;
+        }
+
         // Save the current playback state
         const wasPlaying = !video.paused;
         const currentTime = video.currentTime;
+        const restorePlaybackState = () => {
+            if (wasPlaying && video.paused) {
+                video.currentTime = currentTime;
+                video.play().catch(err => console.log('[Audio Mode] Could not resume playback:', err));
+            }
+        };
 
         // Method 1: Try the standard API methods
         const availableLevels = player.getAvailableQualityLevels ? player.getAvailableQualityLevels() : [];
@@ -1061,20 +1118,45 @@ const forceLowestQuality = (player, video, onComplete = null) => {
 
         // Wait a moment for quality to be applied
         setTimeout(() => {
-            // Verify current quality
-            const currentQuality = player.getPlaybackQuality ? player.getPlaybackQuality() : 'unknown';
+            if (!audioModeEnabled) {
+                restorePlaybackState();
+                onComplete?.();
+                return;
+            }
 
-            // Only use UI interaction if API methods completely failed AND this is the first attempt
-            // Don't do UI interaction during periodic checks to avoid interrupting playback
-            const isFirstAttempt = !player.__audioModeQualityAttempted;
-            if (currentQuality !== 'tiny' && currentQuality !== 'small') {
-                if (isFirstAttempt) {
-                    console.log('[Audio Mode] API methods failed on first attempt, will try UI interaction...');
-                    player.__audioModeQualityAttempted = true;
-                    // Use the generalized click function, pass onComplete callback
-                    clickQualitySetting(video, '144p', onComplete);
-                } else {
-                    // Not first attempt, skip UI interaction
+            // Verify current quality
+            const currentQuality = getPlayerQuality(player);
+
+            if (!isAudioModeQuality(currentQuality)) {
+                console.log(`[Audio Mode] API methods failed on attempt ${attempt}, using UI interaction...`);
+
+                try {
+                    clickQuality(video, '144p', () => {
+                        setTimeout(() => {
+                            const qualityAfterClick = getPlayerQuality(player);
+
+                            if (isAudioModeQuality(qualityAfterClick)) {
+                                player.__audioModeQualityAttempted = true;
+                                onComplete?.();
+                                return;
+                            }
+
+                            if (audioModeEnabled && attempt < LOWEST_QUALITY_RETRY.MAX_ATTEMPTS) {
+                                console.log(`[Audio Mode] 144p was not applied after UI interaction; retrying (${attempt + 1}/${LOWEST_QUALITY_RETRY.MAX_ATTEMPTS})`);
+                                setTimeout(() => {
+                                    forceLowestQuality(player, video, onComplete, {
+                                        ...retryOptions,
+                                        attempt: attempt + 1
+                                    });
+                                }, TIMING.QUALITY_RETRY_DELAY);
+                                return;
+                            }
+
+                            onComplete?.();
+                        }, TIMING.UI_INTERACTION_FINAL);
+                    });
+                } catch (uiError) {
+                    console.error('[Audio Mode] Error in quality UI fallback:', uiError);
                     onComplete?.();
                 }
             } else {
@@ -1084,10 +1166,8 @@ const forceLowestQuality = (player, video, onComplete = null) => {
             }
 
             // Restore playback state if it changed
-            if (wasPlaying && video.paused) {
-                video.play().catch(err => console.log('[Audio Mode] Could not resume playback:', err));
-            }
-        }, 500);
+            restorePlaybackState();
+        }, TIMING.API_VERIFICATION_DELAY);
 
     } catch (error) {
         console.error('[Audio Mode] Error setting quality:', error);
@@ -1285,8 +1365,8 @@ function checkAndEnforceQuality() {
 
     const currentQuality = player.getPlaybackQuality ? player.getPlaybackQuality() : null;
 
-    if (currentQuality && currentQuality !== QUALITY.TARGET && currentQuality !== QUALITY.FALLBACK) {
-        forceLowestQuality(player, getVideoElement());
+    if (currentQuality && !isAudioModeQuality(currentQuality)) {
+        requestQualityOperation('set', 0);
     }
 }
 

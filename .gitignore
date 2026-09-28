@@ -3,3 +3,4 @@ promo_images/
 store-assets/
 .DS_Store
 versions
+dist/

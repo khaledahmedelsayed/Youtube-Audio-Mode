@@ -4,3 +4,4 @@ store-assets/
 .DS_Store
 versions
 dist/
+.worktrees/

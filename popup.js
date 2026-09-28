@@ -7,51 +7,21 @@ const configureFiltersBtn = document.getElementById('configure-filters-btn');
 const langBtn = document.getElementById('lang-btn');
 const settingsBtn = document.getElementById('settings-btn');
 
-const DEFAULT_BACKGROUND_COLOR = '#172554';
-const SETTINGS_EXPORT_KEYS = [
-    'audioMode',
-    'audioModeType',
-    'language',
-    'backgroundType',
-    'backgroundValue',
-    'preferredQuality',
-    'filterRules'
-];
-const VALID_MODE_TYPES = new Set(['always', 'filtered', 'off']);
-const VALID_LANGUAGES = new Set(['en', 'ar']);
-const VALID_QUALITY_VALUES = new Set(['hd2160', 'hd1440', 'hd1080', 'hd720', 'large', 'medium', 'auto']);
+const {
+    t,
+    loadMessages,
+    DEFAULT_BACKGROUND_COLOR,
+    SETTINGS_EXPORT_KEYS,
+    validateImportedSettings,
+    buildExportPayload,
+    exportFileName
+} = globalThis.Earmode;
 
 // Current audio mode type: 'always', 'filtered', or 'off'
 let currentModeType = 'always';
 
-// Current language and loaded messages
+// Current language
 let currentLang = 'en';
-let loadedMessages = {};
-
-// Helper function to get translated messages
-function t(messageName) {
-    // First try to get from loaded messages (for custom language selection)
-    if (loadedMessages[messageName] && loadedMessages[messageName].message) {
-        return loadedMessages[messageName].message;
-    }
-    // Fallback to chrome.i18n if not loaded yet
-    return chrome.i18n.getMessage(messageName) || messageName;
-}
-
-// Load messages for a specific language
-async function loadMessages(lang) {
-    try {
-        const url = chrome.runtime.getURL(`_locales/${lang}/messages.json`);
-        const response = await fetch(url);
-        const messages = await response.json();
-        loadedMessages = messages;
-        currentLang = lang;
-        return messages;
-    } catch (error) {
-        console.error(`Failed to load messages for ${lang}:`, error);
-        return null;
-    }
-}
 
 async function setLanguage(lang) {
     // Load messages for the selected language
@@ -368,98 +338,6 @@ if (qualitySelect) {
     });
 }
 
-function getDefaultFilterRules() {
-    return { whitelist: { channels: [], keywords: [] } };
-}
-
-function sanitizeFilterRules(filterRules) {
-    const rules = filterRules && typeof filterRules === 'object' ? filterRules : getDefaultFilterRules();
-    const whitelist = rules.whitelist && typeof rules.whitelist === 'object' ? rules.whitelist : {};
-    const seenChannels = new Set();
-    const seenKeywords = new Set();
-
-    const channels = Array.isArray(whitelist.channels) ? whitelist.channels : [];
-    const keywords = Array.isArray(whitelist.keywords) ? whitelist.keywords : [];
-
-    return {
-        whitelist: {
-            channels: channels.reduce((items, channel) => {
-                if (!channel || typeof channel !== 'object') return items;
-
-                const id = typeof channel.id === 'string' ? channel.id.trim() : '';
-                const name = typeof channel.name === 'string' ? channel.name.trim() : '';
-                if (!id || seenChannels.has(id)) return items;
-
-                seenChannels.add(id);
-                items.push({
-                    id,
-                    name: name || id,
-                    addedAt: Number.isFinite(channel.addedAt) ? channel.addedAt : Date.now()
-                });
-                return items;
-            }, []),
-            keywords: keywords.reduce((items, keywordRule) => {
-                if (!keywordRule || typeof keywordRule !== 'object') return items;
-
-                const keyword = typeof keywordRule.keyword === 'string' ? keywordRule.keyword.trim() : '';
-                const keywordKey = keyword.toLowerCase();
-                if (!keyword || seenKeywords.has(keywordKey)) return items;
-
-                seenKeywords.add(keywordKey);
-                items.push({
-                    keyword,
-                    caseSensitive: keywordRule.caseSensitive === true,
-                    addedAt: Number.isFinite(keywordRule.addedAt) ? keywordRule.addedAt : Date.now()
-                });
-                return items;
-            }, [])
-        }
-    };
-}
-
-function sanitizeImportedSettings(payload) {
-    const source = payload?.settings && typeof payload.settings === 'object'
-        ? payload.settings
-        : payload;
-
-    if (!source || typeof source !== 'object' || Array.isArray(source)) {
-        throw new Error('Invalid settings file');
-    }
-
-    const settings = {};
-
-    if (VALID_MODE_TYPES.has(source.audioModeType)) {
-        settings.audioModeType = source.audioModeType;
-    }
-
-    if (typeof source.audioMode === 'boolean') {
-        settings.audioMode = source.audioMode;
-    }
-
-    if (VALID_LANGUAGES.has(source.language)) {
-        settings.language = source.language;
-    }
-
-    if (source.backgroundType === 'color' && /^#[0-9a-f]{6}$/i.test(source.backgroundValue || '')) {
-        settings.backgroundType = 'color';
-        settings.backgroundValue = source.backgroundValue;
-    }
-
-    if (VALID_QUALITY_VALUES.has(source.preferredQuality)) {
-        settings.preferredQuality = source.preferredQuality;
-    }
-
-    if (source.filterRules) {
-        settings.filterRules = sanitizeFilterRules(source.filterRules);
-    }
-
-    if (Object.keys(settings).length === 0) {
-        throw new Error('No supported settings found');
-    }
-
-    return settings;
-}
-
 function sendMessageToActiveYouTube(message) {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
         const currentTab = tabs[0];
@@ -507,19 +385,13 @@ async function applyImportedSettings(settings) {
 
 async function exportSettings() {
     const settings = await chrome.storage.sync.get(SETTINGS_EXPORT_KEYS);
-    const payload = {
-        app: 'youtube-audio-mode',
-        version: 1,
-        exportedAt: new Date().toISOString(),
-        settings
-    };
+    const payload = buildExportPayload(settings);
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
-    const date = new Date().toISOString().slice(0, 10);
 
     link.href = url;
-    link.download = `youtube-audio-mode-settings-${date}.json`;
+    link.download = exportFileName();
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -530,7 +402,7 @@ async function exportSettings() {
 async function importSettings(file) {
     const text = await file.text();
     const payload = JSON.parse(text);
-    const settings = sanitizeImportedSettings(payload);
+    const settings = validateImportedSettings(payload);
 
     await chrome.storage.sync.set(settings);
     await applyImportedSettings(settings);

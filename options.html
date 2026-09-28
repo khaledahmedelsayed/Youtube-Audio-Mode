@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Earmode settings</title>
+    <link rel="stylesheet" href="options.css">
+</head>
+
+<body>
+    <div class="page">
+        <header class="top">
+            <svg width="40" height="40" viewBox="0 0 32 32" aria-hidden="true">
+                <rect width="32" height="32" rx="9" fill="#1C1B22" />
+                <path d="M10 19v-3a6 6 0 0 1 12 0v3" fill="none" stroke="#F2C14E" stroke-width="2.6"
+                    stroke-linecap="round" />
+                <rect x="8" y="18" width="4.5" height="7" rx="2" fill="#F2C14E" />
+                <rect x="19.5" y="18" width="4.5" height="7" rx="2" fill="#F2C14E" />
+            </svg>
+            <div>
+                <p class="brand">Earmode</p>
+                <h1 data-i18n="settingsLabel">Settings</h1>
+            </div>
+        </header>
+
+        <div class="layout">
+            <nav class="nav" data-i18n-aria-label="sectionsLabel">
+                <a href="#listening" data-i18n="sectionListening">Listening</a>
+                <a href="#list" data-i18n="sectionList">Your list</a>
+                <a href="#quality" data-i18n="sectionQuality">Video quality</a>
+                <a href="#stats" data-i18n="sectionStats">Stats</a>
+                <a href="#backup" data-i18n="settingsBackup">Backup</a>
+                <a href="#language" data-i18n="languageLabel">Language</a>
+            </nav>
+
+            <main class="sections">
+                <!-- 1. Listening -->
+                <section class="card" id="listening" aria-labelledby="listening-title">
+                    <h2 id="listening-title" data-i18n="sectionListening">Listening</h2>
+
+                    <div class="field">
+                        <span class="label" id="auto-label" data-i18n="autoListenLabel">Auto-listen for new videos</span>
+                        <div class="seg seg-3" id="mode-seg" role="group" aria-labelledby="auto-label">
+                            <button type="button" data-mode="always" data-i18n="modeEverything" aria-pressed="false">Everything</button>
+                            <button type="button" data-mode="filtered" data-i18n="modeMyList" aria-pressed="false">My list</button>
+                            <button type="button" data-mode="off" data-i18n="modeNothing" aria-pressed="false">Nothing</button>
+                        </div>
+                        <p class="hint" id="mode-hint"></p>
+                    </div>
+
+                    <div class="field">
+                        <span class="label" id="look-label" data-i18n="playerLookLabel">Player look while listening</span>
+                        <div class="looks" id="looks" role="group" aria-labelledby="look-label">
+                            <button type="button" class="look" data-look="card" aria-pressed="false">
+                                <span class="sw sw-card" aria-hidden="true"></span><span data-i18n="lookCard">Card</span>
+                            </button>
+                            <button type="button" class="look" data-look="blur" aria-pressed="false">
+                                <span class="sw sw-blur" aria-hidden="true"></span><span data-i18n="lookBlur">Blur</span>
+                            </button>
+                            <button type="button" class="look" data-look="minimal" aria-pressed="false">
+                                <span class="sw sw-minimal" aria-hidden="true"></span><span data-i18n="lookSimple">Simple</span>
+                            </button>
+                            <button type="button" class="look" data-look="waves" aria-pressed="false">
+                                <span class="sw sw-waves" aria-hidden="true"></span><span data-i18n="lookWaves">Waves</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label class="label" for="bg-color" data-i18n="audioModeBackground">Background color</label>
+                        <div class="color-row">
+                            <input type="color" id="bg-color" value="#172554" aria-describedby="bg-hint">
+                            <code id="bg-value">#172554</code>
+                        </div>
+                        <p class="hint" id="bg-hint" data-i18n="audioModeBackgroundHint">Used by the Simple and Waves looks.</p>
+                    </div>
+                </section>
+
+                <!-- 2. Your list -->
+                <section class="card" id="list" aria-labelledby="list-title">
+                    <h2 id="list-title" data-i18n="sectionList">Your list</h2>
+                    <p class="hint" data-i18n="filterHint">When auto-listen is set to My list, these videos start as audio.</p>
+
+                    <div class="field">
+                        <h3 id="channels-title" data-i18n="channels">Channels</h3>
+                        <ul class="rules" id="channels-list" aria-labelledby="channels-title"></ul>
+                        <p class="empty" id="channels-empty" data-i18n="noChannels" hidden>No channels yet.</p>
+                    </div>
+
+                    <div class="field">
+                        <h3 id="keywords-title" data-i18n="keywords">Keywords</h3>
+                        <div class="add-row">
+                            <label class="sr-only" for="keyword-input" data-i18n="addKeyword">Add keyword</label>
+                            <input type="text" id="keyword-input" maxlength="100" autocomplete="off"
+                                data-i18n-placeholder="enterKeyword" placeholder="Enter keyword">
+                            <button type="button" class="btn btn-primary" id="keyword-add" data-i18n="add">Add</button>
+                        </div>
+                        <ul class="rules" id="keywords-list" aria-labelledby="keywords-title"></ul>
+                        <p class="empty" id="keywords-empty" data-i18n="noKeywords" hidden>No keywords yet.</p>
+                    </div>
+                </section>
+
+                <!-- 3. Video quality -->
+                <section class="card" id="quality" aria-labelledby="quality-title">
+                    <h2 id="quality-title" data-i18n="sectionQuality">Video quality</h2>
+                    <div class="field">
+                        <label class="label" for="quality-select" data-i18n="preferredQuality">Preferred quality</label>
+                        <select id="quality-select" aria-describedby="quality-hint">
+                            <option value="hd2160">2160p (4K)</option>
+                            <option value="hd1440">1440p</option>
+                            <option value="hd1080">1080p</option>
+                            <option value="hd720" selected>720p</option>
+                            <option value="large">480p</option>
+                            <option value="medium">360p</option>
+                            <option value="auto" data-i18n="qualityAuto">Auto</option>
+                        </select>
+                        <p class="hint" id="quality-hint" data-i18n="qualityHint">Quality to use when audio is off</p>
+                    </div>
+                </section>
+
+                <!-- 4. Stats -->
+                <section class="card" id="stats" aria-labelledby="stats-title">
+                    <div class="card-head">
+                        <h2 id="stats-title" data-i18n="sectionStats">Stats</h2>
+                        <div class="seg seg-2" id="range-seg" role="group" data-i18n-aria-label="statsRange">
+                            <button type="button" data-range="month" data-i18n="thisMonth" aria-pressed="true">This month</button>
+                            <button type="button" data-range="all" data-i18n="allTime" aria-pressed="false">All time</button>
+                        </div>
+                    </div>
+
+                    <dl class="tiles" aria-live="polite">
+                        <div class="tile tile-saved">
+                            <dt data-i18n="savedData">Saved vs 720p</dt>
+                            <dd id="stat-saved">0 MB</dd>
+                        </div>
+                        <div class="tile">
+                            <dt data-i18n="listenedTime">Time listened</dt>
+                            <dd id="stat-listened">0s</dd>
+                        </div>
+                        <div class="tile">
+                            <dt data-i18n="activeTime">Time active</dt>
+                            <dd id="stat-active">0s</dd>
+                        </div>
+                    </dl>
+
+                    <table class="estimate">
+                        <caption data-i18n="estDataUsage">Estimated data use</caption>
+                        <thead>
+                            <tr>
+                                <th scope="col" data-i18n="quality">Quality</th>
+                                <th scope="col" data-i18n="usage">Usage</th>
+                                <th scope="col" data-i18n="saved">Saved</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="row-audio">
+                                <th scope="row" data-i18n="audioMode">Audio mode</th>
+                                <td id="usage-144">0 MB</td>
+                                <td>-</td>
+                            </tr>
+                            <tr>
+                                <th scope="row">720p</th>
+                                <td id="usage-720">0 MB</td>
+                                <td class="plus" id="saved-720">0 MB</td>
+                            </tr>
+                            <tr>
+                                <th scope="row">1080p</th>
+                                <td id="usage-1080">0 MB</td>
+                                <td class="plus" id="saved-1080">0 MB</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </section>
+
+                <!-- 5. Backup -->
+                <section class="card" id="backup" aria-labelledby="backup-title">
+                    <h2 id="backup-title" data-i18n="settingsBackup">Backup</h2>
+                    <p class="hint" data-i18n="settingsBackupHint">Save your settings and list to a file, or restore them.</p>
+                    <div class="btn-row">
+                        <button type="button" class="btn" id="export-btn" data-i18n="exportSettings">Export</button>
+                        <button type="button" class="btn" id="import-btn" data-i18n="importSettings">Import</button>
+                        <input type="file" id="import-file" accept="application/json,.json" hidden>
+                    </div>
+                </section>
+
+                <!-- 6. Language -->
+                <section class="card" id="language" aria-labelledby="language-title">
+                    <h2 id="language-title" data-i18n="languageLabel">Language</h2>
+                    <div class="seg seg-2" id="lang-seg" role="group" aria-labelledby="language-title">
+                        <button type="button" data-lang="en" lang="en" aria-pressed="false">English</button>
+                        <button type="button" data-lang="ar" lang="ar" dir="rtl" aria-pressed="false">العربية</button>
+                    </div>
+                </section>
+            </main>
+        </div>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script src="shared.js"></script>
+    <script src="options.js"></script>
+</body>
+
+</html>

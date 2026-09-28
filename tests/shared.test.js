@@ -224,3 +224,86 @@ test('modeHint picks the hint for each auto-listen mode and list size', () => {
     assert.equal(api.modeHint('filtered', 1, t), '1 channel in your list.');
     assert.equal(api.modeHint('filtered', 4, t), '4 channels in your list.');
 });
+
+test('summarizeStats adds this month only for the month range', () => {
+    const api = loadShared();
+    const statsLogs = { '2026-09-01': 600, '2026-09-28': 600, '2026-08-31': 1200, bad: 'x' };
+    const activeLogs = { '2026-09-02': 900, '2026-07-01': 100 };
+    const now = new Date('2026-09-28T12:00:00Z');
+    assert.deepEqual(plain(api.summarizeStats(statsLogs, activeLogs, 'month', now)), {
+        listenedSeconds: 1200,
+        activeSeconds: 900,
+        usage144: 15,
+        usage720: 375,
+        usage1080: 675,
+        saved720: 360,
+        saved1080: 660
+    });
+});
+
+test('summarizeStats adds every day for the all range and handles missing logs', () => {
+    const api = loadShared();
+    const now = new Date('2026-09-28T12:00:00Z');
+    const all = plain(api.summarizeStats({ '2026-09-01': 60, '2025-01-01': 60 }, { '2020-01-01': 5 }, 'all', now));
+    assert.equal(all.listenedSeconds, 120);
+    assert.equal(all.activeSeconds, 5);
+    assert.equal(all.usage144, 1.5);
+    assert.equal(all.saved1080, 66);
+    const empty = plain(api.summarizeStats(undefined, null, 'all', now));
+    assert.deepEqual(empty, {
+        listenedSeconds: 0, activeSeconds: 0, usage144: 0, usage720: 0, usage1080: 0, saved720: 0, saved1080: 0
+    });
+});
+
+test('formatDuration shows the two largest units', () => {
+    const api = loadShared();
+    const t = key => ({ timeH: 'h', timeM: 'm', timeS: 's' }[key]);
+    assert.equal(api.formatDuration(0, t), '0s');
+    assert.equal(api.formatDuration(59.9, t), '59s');
+    assert.equal(api.formatDuration(125, t), '2m 5s');
+    assert.equal(api.formatDuration(3 * 3600 + 7 * 60 + 9, t), '3h 7m');
+    assert.equal(api.formatDuration(-5, t), '0s');
+});
+
+test('addKeyword trims, ignores empty text and dedupes without mutating', () => {
+    const api = loadShared();
+    const rules = {
+        whitelist: {
+            channels: [{ id: 'UC1', name: 'One', addedAt: 1 }],
+            keywords: [{ keyword: 'Podcast', caseSensitive: false, addedAt: 2 }]
+        }
+    };
+    const next = plain(api.addKeyword(rules, '  lofi  ', 99));
+    assert.deepEqual(next.whitelist.keywords, [
+        { keyword: 'Podcast', caseSensitive: false, addedAt: 2 },
+        { keyword: 'lofi', caseSensitive: false, addedAt: 99 }
+    ]);
+    assert.deepEqual(next.whitelist.channels, rules.whitelist.channels);
+    assert.equal(rules.whitelist.keywords.length, 1, 'input not mutated');
+    assert.equal(plain(api.addKeyword(rules, 'PODCAST', 99)).whitelist.keywords.length, 1);
+    assert.equal(plain(api.addKeyword(rules, '   ', 99)).whitelist.keywords.length, 1);
+    assert.deepEqual(plain(api.addKeyword(undefined, 'news', 5)), {
+        whitelist: { channels: [], keywords: [{ keyword: 'news', caseSensitive: false, addedAt: 5 }] }
+    });
+});
+
+test('removeKeyword and removeChannel drop one entry without mutating', () => {
+    const api = loadShared();
+    const rules = {
+        whitelist: {
+            channels: [{ id: 'UC1', name: 'One', addedAt: 1 }, { id: 'UC2', name: 'Two', addedAt: 2 }],
+            keywords: [{ keyword: 'Podcast', caseSensitive: false, addedAt: 3 }, { keyword: 'news', caseSensitive: false, addedAt: 4 }]
+        }
+    };
+    const noKeyword = plain(api.removeKeyword(rules, 'Podcast'));
+    assert.deepEqual(noKeyword.whitelist.keywords, [{ keyword: 'news', caseSensitive: false, addedAt: 4 }]);
+    assert.equal(noKeyword.whitelist.channels.length, 2);
+
+    const noChannel = plain(api.removeChannel(rules, 'UC1'));
+    assert.deepEqual(noChannel.whitelist.channels, [{ id: 'UC2', name: 'Two', addedAt: 2 }]);
+    assert.equal(noChannel.whitelist.keywords.length, 2);
+
+    assert.equal(rules.whitelist.channels.length, 2, 'input not mutated');
+    assert.equal(rules.whitelist.keywords.length, 2, 'input not mutated');
+    assert.equal(plain(api.removeChannel(rules, 'missing')).whitelist.channels.length, 2);
+});

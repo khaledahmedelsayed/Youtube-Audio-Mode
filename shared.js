@@ -126,6 +126,7 @@
     // Data rates in MB per minute, used to estimate data saved by listening at 144p
     const RATE_720P_MB_PER_MIN = 18.75;
     const RATE_144P_MB_PER_MIN = 0.75;
+    const RATE_1080P_MB_PER_MIN = 33.75;
 
     /**
      * Sum the listened seconds logged in the month of `now`.
@@ -135,11 +136,66 @@
      * @returns {number}
      */
     function sumMonthSeconds(statsLogs, now = new Date()) {
-        if (!statsLogs || typeof statsLogs !== 'object') return 0;
-        const prefix = now.toISOString().slice(0, 7);
-        return Object.entries(statsLogs).reduce((total, [date, seconds]) => (
+        return sumLogSeconds(statsLogs, now.toISOString().slice(0, 7));
+    }
+
+    /**
+     * Sum logged seconds, optionally only for dates starting with `prefix`.
+     * @param {Object<string, number>} logs
+     * @param {string} [prefix] Like 'YYYY-MM'; empty adds every day
+     * @returns {number}
+     */
+    function sumLogSeconds(logs, prefix = '') {
+        if (!logs || typeof logs !== 'object') return 0;
+        return Object.entries(logs).reduce((total, [date, seconds]) => (
             date.startsWith(prefix) && Number.isFinite(seconds) ? total + seconds : total
         ), 0);
+    }
+
+    /**
+     * Summarize listening stats for the stats section.
+     * Usage values are estimated megabytes for the listened time at each quality.
+     * @param {Object<string, number>} statsLogs Listened seconds per UTC day
+     * @param {Object<string, number>} activeLogs Active seconds per UTC day
+     * @param {'month'|'all'} range
+     * @param {Date} [now]
+     * @returns {{listenedSeconds: number, activeSeconds: number, usage144: number, usage720: number,
+     *     usage1080: number, saved720: number, saved1080: number}}
+     */
+    function summarizeStats(statsLogs, activeLogs, range, now = new Date()) {
+        const prefix = range === 'month' ? now.toISOString().slice(0, 7) : '';
+        const listenedSeconds = sumLogSeconds(statsLogs, prefix);
+        const activeSeconds = sumLogSeconds(activeLogs, prefix);
+        const minutes = listenedSeconds / 60;
+        const usage144 = minutes * RATE_144P_MB_PER_MIN;
+        const usage720 = minutes * RATE_720P_MB_PER_MIN;
+        const usage1080 = minutes * RATE_1080P_MB_PER_MIN;
+
+        return {
+            listenedSeconds,
+            activeSeconds,
+            usage144,
+            usage720,
+            usage1080,
+            saved720: usage720 - usage144,
+            saved1080: usage1080 - usage144
+        };
+    }
+
+    /**
+     * Format seconds with the two largest units, like "3h 7m", "2m 5s" or "9s".
+     * @param {number} seconds
+     * @param {function(string): string} translate Message lookup for timeH/timeM/timeS
+     * @returns {string}
+     */
+    function formatDuration(seconds, translate) {
+        const total = Math.max(0, Math.floor(Number(seconds) || 0));
+        const h = Math.floor(total / 3600);
+        const m = Math.floor(total / 60) % 60;
+        const s = total % 60;
+        if (h > 0) return `${h}${translate('timeH')} ${m}${translate('timeM')}`;
+        if (m > 0) return `${m}${translate('timeM')} ${s}${translate('timeS')}`;
+        return `${s}${translate('timeS')}`;
     }
 
     /**
@@ -242,6 +298,44 @@
     }
 
     /**
+     * Add a keyword to the list (trimmed, case-insensitive dedupe). Does not mutate the input.
+     * @param {*} filterRules
+     * @param {string} text
+     * @param {number} [now] Timestamp for addedAt
+     * @returns {{whitelist: {channels: Array, keywords: Array}}}
+     */
+    function addKeyword(filterRules, text, now = Date.now()) {
+        const rules = sanitizeFilterRules(filterRules);
+        const keyword = typeof text === 'string' ? text.trim() : '';
+        if (keyword) rules.whitelist.keywords.push({ keyword, caseSensitive: false, addedAt: now });
+        return sanitizeFilterRules(rules);
+    }
+
+    /**
+     * Remove a keyword (exact match). Does not mutate the input.
+     * @param {*} filterRules
+     * @param {string} keyword
+     * @returns {{whitelist: {channels: Array, keywords: Array}}}
+     */
+    function removeKeyword(filterRules, keyword) {
+        const rules = sanitizeFilterRules(filterRules);
+        rules.whitelist.keywords = rules.whitelist.keywords.filter(item => item.keyword !== keyword);
+        return rules;
+    }
+
+    /**
+     * Remove a channel by id. Does not mutate the input.
+     * @param {*} filterRules
+     * @param {string} channelId
+     * @returns {{whitelist: {channels: Array, keywords: Array}}}
+     */
+    function removeChannel(filterRules, channelId) {
+        const rules = sanitizeFilterRules(filterRules);
+        rules.whitelist.channels = rules.whitelist.channels.filter(channel => channel.id !== channelId);
+        return rules;
+    }
+
+    /**
      * Validate a parsed settings file and return only the supported, valid settings.
      * Accepts files exported by Earmode, by the older YouTube Audio Mode, or with no app id.
      * @param {*} payload Parsed JSON from the settings file.
@@ -339,11 +433,16 @@
         exportFileName,
         sumMonthSeconds,
         savedMegabytes,
+        summarizeStats,
+        formatDuration,
         formatSavedAmount,
         fillTemplate,
         modeHint,
         videoChannels,
         channelsInList,
-        toggleChannels
+        toggleChannels,
+        addKeyword,
+        removeKeyword,
+        removeChannel
     };
 })();

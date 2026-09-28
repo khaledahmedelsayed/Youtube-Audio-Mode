@@ -3,57 +3,9 @@
         "message": "وضع الصوت في يوتيوب",
         "description": "Extension name"
     },
-    "appDesc": {
-        "message": "وفر الانترنت، استمتع بالصوت",
-        "description": "Short tagline shown in popup header"
-    },
     "extDescription": {
         "message": "شغّل فيديوهات يوتيوب في وضع الصوت فقط لتوفير استهلاك الإنترنت",
         "description": "Extension description shown in Chrome Web Store"
-    },
-    "settings": {
-        "message": "الإعدادات",
-        "description": "Settings panel header"
-    },
-    "audioOnly": {
-        "message": "وضع الصوت",
-        "description": "Main toggle section header"
-    },
-    "statusOff": {
-        "message": "اضغط للتفعيل",
-        "description": "Status text when audio mode is off"
-    },
-    "statusOn": {
-        "message": "وضع الصوت مفعل",
-        "description": "Status text when audio mode is on"
-    },
-    "modeAlwaysOn": {
-        "message": "تفعيل دائم",
-        "description": "Mode selector: always enable audio mode"
-    },
-    "modeFiltered": {
-        "message": "مُصفّى",
-        "description": "Mode selector: enable based on filter rules"
-    },
-    "configureFilters": {
-        "message": "إعداد الفلاتر",
-        "description": "Button to open filter configuration"
-    },
-    "modeAlwaysOnDesc": {
-        "message": "وضع الصوت على كل الفيديوهات",
-        "description": "Description for always on mode"
-    },
-    "modeFilteredDesc": {
-        "message": "حسب قواعد التصفية",
-        "description": "Description for filtered mode"
-    },
-    "modeOff": {
-        "message": "إيقاف",
-        "description": "Mode selector: extension disabled"
-    },
-    "modeOffDesc": {
-        "message": "الإضافة معطلة",
-        "description": "Description for off mode"
     },
     "thisMonth": {
         "message": "هذا الشهر",
@@ -95,14 +47,6 @@
         "message": "وضع الصوت",
         "description": "Quality row label for audio mode (144p)"
     },
-    "developedBy": {
-        "message": "تطوير أحمد عدلي",
-        "description": "Footer developer credit"
-    },
-    "onlyYoutube": {
-        "message": "يعمل فقط على فيديوهات يوتيوب",
-        "description": "Message shown when not on YouTube"
-    },
     "timeH": {
         "message": "س",
         "description": "Time unit: hours"
@@ -131,49 +75,9 @@
         "message": "قواعد التصفية",
         "description": "Filter panel header"
     },
-    "autoRules": {
-        "message": "تفعيل القواعد التلقائية",
-        "description": "Toggle label for automatic rule application"
-    },
-    "alwaysEnable": {
-        "message": "تفعيل دائم",
-        "description": "Button to always enable audio mode for this channel"
-    },
-    "alwaysDisable": {
-        "message": "إيقاف دائم",
-        "description": "Button to always disable audio mode for this channel"
-    },
     "addKeyword": {
         "message": "إضافة كلمة مفتاحية",
         "description": "Label for keyword input section"
-    },
-    "currentChannel": {
-        "message": "القناة الحالية",
-        "description": "Label for current channel section"
-    },
-    "notOnVideo": {
-        "message": "لست على فيديو",
-        "description": "Message when not on a YouTube video page"
-    },
-    "channelNotFound": {
-        "message": "القناة غير موجودة",
-        "description": "Message when channel info cannot be extracted"
-    },
-    "whitelist": {
-        "message": "القائمة البيضاء",
-        "description": "Whitelist label"
-    },
-    "blacklist": {
-        "message": "القائمة السوداء",
-        "description": "Blacklist label"
-    },
-    "keyword": {
-        "message": "كلمة مفتاحية",
-        "description": "Keyword rule type"
-    },
-    "channelId": {
-        "message": "معرف القناة",
-        "description": "Channel rule type"
     },
     "channels": {
         "message": "القنوات",
@@ -184,11 +88,11 @@
         "description": "Keywords list header"
     },
     "noChannels": {
-        "message": "لا توجد قنوات",
+        "message": "لا توجد قنوات بعد. أضف قناة بزر استمع دائمًا في النافذة المنبثقة أو بزر Earmode في المشغل.",
         "description": "Empty state for channels list"
     },
     "noKeywords": {
-        "message": "لا توجد كلمات مفتاحية",
+        "message": "لا توجد كلمات مفتاحية بعد.",
         "description": "Empty state for keywords list"
     },
     "add": {
@@ -203,29 +107,17 @@
         "message": "أدخل كلمة مفتاحية",
         "description": "Placeholder for keyword input"
     },
-    "enterChannelId": {
-        "message": "أدخل معرف القناة (UC...)",
-        "description": "Placeholder for channel ID input"
-    },
-    "ruleAdded": {
-        "message": "تمت إضافة القاعدة",
-        "description": "Toast message when rule is added"
-    },
-    "ruleRemoved": {
-        "message": "تمت إزالة القاعدة",
-        "description": "Toast message when rule is removed"
-    },
     "filterHint": {
-        "message": "الفيديوهات المطابقة للقنوات أو الكلمات المفتاحية أدناه ستعمل في وضع الصوت. باقي الفيديوهات ستعمل بشكل عادي.",
+        "message": "عند ضبط الاستماع التلقائي على قائمتي، تبدأ فيديوهات هذه القنوات، أو التي يحتوي عنوانها على إحدى هذه الكلمات، كصوت.",
         "description": "Hint explaining how the filter works"
     },
     "audioModeBackground": {
-        "message": "خلفية وضع الصوت",
+        "message": "لون الخلفية",
         "description": "Label for audio mode overlay background color"
     },
     "audioModeBackgroundHint": {
-        "message": "لون خلفية مشغل وضع الصوت فقط",
-        "description": "Hint clarifying the color picker affects the audio mode overlay, not the popup"
+        "message": "يظهر خلف مظهري بسيط وموجات.",
+        "description": "Hint under the background colour picker"
     },
     "preferredQuality": {
         "message": "الجودة المفضلة",
@@ -236,11 +128,11 @@
         "description": "Hint text for quality selector"
     },
     "settingsBackup": {
-        "message": "استيراد / تصدير الإعدادات",
-        "description": "Label for import/export settings controls"
+        "message": "النسخ الاحتياطي",
+        "description": "Options page section title for import and export"
     },
     "settingsBackupHint": {
-        "message": "نسخ أو استعادة الوضع والمظهر والجودة وقواعد التصفية",
+        "message": "احفظ إعداداتك وقائمتك في ملف، أو استعدها منه.",
         "description": "Hint for import/export settings controls"
     },
     "exportSettings": {
@@ -426,5 +318,41 @@
     "menuPlayerLook": {
         "message": "شكل المشغل",
         "description": "Title of the player look block in the in-player menu"
+    },
+    "sectionsLabel": {
+        "message": "الأقسام",
+        "description": "Accessible name of the options page navigation"
+    },
+    "sectionListening": {
+        "message": "الاستماع",
+        "description": "Options page section title"
+    },
+    "sectionList": {
+        "message": "قائمتك",
+        "description": "Options page section title"
+    },
+    "sectionQuality": {
+        "message": "جودة الفيديو",
+        "description": "Options page section title"
+    },
+    "sectionStats": {
+        "message": "الإحصائيات",
+        "description": "Options page section title"
+    },
+    "removeItem": {
+        "message": "إزالة {name}",
+        "description": "Accessible label of a remove button. {name} is the channel or keyword"
+    },
+    "qualityAuto": {
+        "message": "تلقائي",
+        "description": "Quality option: let YouTube choose"
+    },
+    "statsRange": {
+        "message": "الفترة",
+        "description": "Accessible name of the This month / All time toggle"
+    },
+    "alreadyInList": {
+        "message": "موجودة بالفعل في قائمتك",
+        "description": "Toast when the keyword is already in the list"
     }
 }

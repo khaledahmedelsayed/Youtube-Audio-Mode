@@ -3,64 +3,16 @@
     "message": "YouTube Audio Mode",
     "description": "Extension name"
   },
-  "appDesc": {
-    "message": "Save bandwidth",
-    "description": "Short tagline shown in popup header"
-  },
   "extDescription": {
     "message": "Play YouTube videos in audio-only mode to save bandwidth and reduce internet usage",
     "description": "Extension description shown in Chrome Web Store"
   },
-  "settings": {
-    "message": "Settings",
-    "description": "Settings panel header"
-  },
-  "audioOnly": {
-    "message": "Audio Only",
-    "description": "Main toggle section header"
-  },
-  "statusOff": {
-    "message": "Click to enable",
-    "description": "Status text when audio mode is off"
-  },
-  "statusOn": {
-    "message": "Audio mode is ON",
-    "description": "Status text when audio mode is on"
-  },
-  "modeAlwaysOn": {
-    "message": "Always On",
-    "description": "Mode selector: always enable audio mode"
-  },
-  "modeFiltered": {
-    "message": "Filtered",
-    "description": "Mode selector: enable based on filter rules"
-  },
-  "configureFilters": {
-    "message": "Configure Filters",
-    "description": "Button to open filter configuration"
-  },
-  "modeAlwaysOnDesc": {
-    "message": "Audio mode on all videos",
-    "description": "Description for always on mode"
-  },
-  "modeFilteredDesc": {
-    "message": "Based on your filter rules",
-    "description": "Description for filtered mode"
-  },
-  "modeOff": {
-    "message": "Off",
-    "description": "Mode selector: extension disabled"
-  },
-  "modeOffDesc": {
-    "message": "Extension disabled",
-    "description": "Description for off mode"
-  },
   "thisMonth": {
-    "message": "This Month",
+    "message": "This month",
     "description": "Stats filter: current month"
   },
   "allTime": {
-    "message": "All Time",
+    "message": "All time",
     "description": "Stats filter: all time"
   },
   "savedData": {
@@ -68,15 +20,15 @@
     "description": "Label for data saved statistic"
   },
   "listenedTime": {
-    "message": "Listened",
+    "message": "Time listened",
     "description": "Label for listened time statistic"
   },
   "activeTime": {
-    "message": "Active",
+    "message": "Time active",
     "description": "Label for active time statistic"
   },
   "estDataUsage": {
-    "message": "Est. Data Usage",
+    "message": "Estimated data use",
     "description": "Table header for estimated data usage"
   },
   "quality": {
@@ -92,12 +44,8 @@
     "description": "Table column header: saved"
   },
   "audioMode": {
-    "message": "Audio Mode",
+    "message": "Audio mode",
     "description": "Quality row label for audio mode (144p)"
-  },
-  "onlyYoutube": {
-    "message": "Only works on YouTube videos",
-    "description": "Message shown when not on YouTube"
   },
   "timeH": {
     "message": "h",
@@ -127,49 +75,9 @@
     "message": "Filter Rules",
     "description": "Filter panel header"
   },
-  "autoRules": {
-    "message": "Enable auto-rules",
-    "description": "Toggle label for automatic rule application"
-  },
-  "alwaysEnable": {
-    "message": "Always Enable",
-    "description": "Button to always enable audio mode for this channel"
-  },
-  "alwaysDisable": {
-    "message": "Always Disable",
-    "description": "Button to always disable audio mode for this channel"
-  },
   "addKeyword": {
-    "message": "Add Keyword",
+    "message": "Add keyword",
     "description": "Label for keyword input section"
-  },
-  "currentChannel": {
-    "message": "Current Channel",
-    "description": "Label for current channel section"
-  },
-  "notOnVideo": {
-    "message": "Not on a video",
-    "description": "Message when not on a YouTube video page"
-  },
-  "channelNotFound": {
-    "message": "Channel not found",
-    "description": "Message when channel info cannot be extracted"
-  },
-  "whitelist": {
-    "message": "Whitelist",
-    "description": "Whitelist label"
-  },
-  "blacklist": {
-    "message": "Blacklist",
-    "description": "Blacklist label"
-  },
-  "keyword": {
-    "message": "Keyword",
-    "description": "Keyword rule type"
-  },
-  "channelId": {
-    "message": "Channel ID",
-    "description": "Channel rule type"
   },
   "channels": {
     "message": "Channels",
@@ -180,11 +88,11 @@
     "description": "Keywords list header"
   },
   "noChannels": {
-    "message": "No channels added",
+    "message": "No channels yet. Add one with Always listen in the popup or with the Earmode button in the player.",
     "description": "Empty state for channels list"
   },
   "noKeywords": {
-    "message": "No keywords added",
+    "message": "No keywords yet.",
     "description": "Empty state for keywords list"
   },
   "add": {
@@ -199,44 +107,32 @@
     "message": "Enter keyword",
     "description": "Placeholder for keyword input"
   },
-  "enterChannelId": {
-    "message": "Enter channel ID (UC...)",
-    "description": "Placeholder for channel ID input"
-  },
-  "ruleAdded": {
-    "message": "Rule added",
-    "description": "Toast message when rule is added"
-  },
-  "ruleRemoved": {
-    "message": "Rule removed",
-    "description": "Toast message when rule is removed"
-  },
   "filterHint": {
-    "message": "Videos matching channels or keywords below will play in audio mode. All other videos play normally.",
+    "message": "When auto-listen is set to My list, videos from these channels, or with one of these keywords in the title, start as audio.",
     "description": "Hint explaining how the filter works"
   },
   "audioModeBackground": {
-    "message": "Audio Mode Background",
+    "message": "Background color",
     "description": "Label for audio mode overlay background color"
   },
   "audioModeBackgroundHint": {
-    "message": "Background color for the audio mode player overlay only",
-    "description": "Hint clarifying the color picker affects the audio mode overlay, not the popup"
+    "message": "Used behind the Simple and Waves looks.",
+    "description": "Hint under the background colour picker"
   },
   "preferredQuality": {
-    "message": "Preferred Quality",
+    "message": "Preferred quality",
     "description": "Label for quality selector in settings"
   },
   "qualityHint": {
-    "message": "Quality to use when audio mode is off",
+    "message": "Quality to use when audio is off",
     "description": "Hint text for quality selector"
   },
   "settingsBackup": {
-    "message": "Import / Export Settings",
-    "description": "Label for import/export settings controls"
+    "message": "Backup",
+    "description": "Options page section title for import and export"
   },
   "settingsBackupHint": {
-    "message": "Back up or restore mode, appearance, quality, and filter rules",
+    "message": "Save your settings and list to a file, or restore them from one.",
     "description": "Hint for import/export settings controls"
   },
   "exportSettings": {
@@ -422,5 +318,41 @@
   "menuPlayerLook": {
     "message": "Player look",
     "description": "Title of the player look block in the in-player menu"
+  },
+  "sectionsLabel": {
+    "message": "Sections",
+    "description": "Accessible name of the options page navigation"
+  },
+  "sectionListening": {
+    "message": "Listening",
+    "description": "Options page section title"
+  },
+  "sectionList": {
+    "message": "Your list",
+    "description": "Options page section title"
+  },
+  "sectionQuality": {
+    "message": "Video quality",
+    "description": "Options page section title"
+  },
+  "sectionStats": {
+    "message": "Stats",
+    "description": "Options page section title"
+  },
+  "removeItem": {
+    "message": "Remove {name}",
+    "description": "Accessible label of a remove button. {name} is the channel or keyword"
+  },
+  "qualityAuto": {
+    "message": "Auto",
+    "description": "Quality option: let YouTube choose"
+  },
+  "statsRange": {
+    "message": "Time range",
+    "description": "Accessible name of the This month / All time toggle"
+  },
+  "alreadyInList": {
+    "message": "Already in your list",
+    "description": "Toast when the keyword is already in the list"
   }
 }

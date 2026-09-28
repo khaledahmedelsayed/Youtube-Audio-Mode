@@ -1,112 +1,69 @@
-# YouTube Audio Mode
+# Earmode: Audio Only for YouTube
 
-> Enhanced fork of [YouTube Audio Mode](https://github.com/devahmedadli/youtube-audio-mode) by [Ahmed Adli](https://github.com/devahmedadli).
+Listen to YouTube with the video turned off. Pick channels that always play as audio and save mobile data.
 
-Save bandwidth and keep YouTube focused on listening. This Chrome extension switches YouTube videos into audio-only playback by forcing low video quality, hiding the video player, and showing a lightweight audio-mode overlay.
+> Earmode started as a fork of [YouTube Audio Mode](https://github.com/devahmedadli/youtube-audio-mode) by [Ahmed Adli](https://github.com/devahmedadli).
 
 [Install from the Chrome Web Store](https://chromewebstore.google.com/detail/youtube-audio-mode/chjcfgfdkjkodkjcmooholonanhldeeh)
 
-## Key Features
+## What it does
 
-- **Three audio modes:** choose Always On, Filtered, or Off from the popup.
-- **Filtered audio mode:** enable audio mode only for saved channels or title keywords.
-- **Multi-channel detection:** videos with multiple credited channels can be added to filters and matched reliably.
-- **Preferred quality restore:** choose the quality YouTube should use when audio mode is off.
-- **Usage statistics:** estimate saved data compared with 720p and 1080p, plus listened and active time.
-- **Audio-mode overlay background:** customize the player overlay background color. This setting affects the audio-mode overlay only, not the popup UI.
-- **Settings import/export:** back up and restore mode, appearance, preferred quality, and filter rules as JSON.
-- **English and Arabic UI:** includes RTL support for Arabic.
-- **Private by default:** preferences and usage data stay in Chrome storage on your device.
+Earmode plays YouTube videos as sound. It drops the picture to 144p and covers the player with a calm "player look", so a podcast, a lecture or a long mix uses much less data.
 
-## Operating Modes
+## Features
 
-**Always On**
-Audio mode is enabled for all YouTube videos.
+- **Video or Audio switch.** Click the Earmode icon on any video and flip one big switch. It only changes the video you have open; the next video follows your auto-listen choice. A line under the switch says why the video plays the way it does, for example "because this channel is in your list". **Back to auto** undoes your pick.
+- **Auto-listen for new videos.** Choose **Everything**, **My list** or **Nothing**.
+- **Your list.** Tap **Always listen** in the popup to add the channel of the video you are watching. Keywords on the settings page also match video titles.
+- **Button on the player.** The Earmode button in the corner of the YouTube player opens the same controls without leaving the video.
+- **Four player looks.** Card (video art and title), Blur (a blurred copy of the video picture), Simple (a headphones ring on a solid color you choose) and Waves (a slow wave line).
+- **Stats.** Data saved this month and all time, estimated against 720p, plus time listened.
+- **Settings page.** Your channels and keywords, the quality to use when audio is off, background color, backup (export and import) and language.
+- **English and Arabic**, with a full right-to-left layout in Arabic.
+- **Private.** Everything stays in your browser. No account, no analytics, no servers.
 
-**Filtered**
-Audio mode is enabled only when the current video matches your saved channel or keyword rules. The Configure Filters button opens Settings directly at the filter section.
-
-**Off**
-The extension is disabled and YouTube plays normally using your preferred quality.
-
-## Filter Rules
-
-Filtered mode supports:
-
-- Saved YouTube channels
-- Videos credited to multiple channels
-- Title keywords
-- Quick-add for the current video channel
-
-Videos matching saved channels or keywords play in audio mode. All other videos play normally.
-
-## Settings
-
-The Settings panel includes:
-
-- Audio-mode overlay background color
-- Preferred quality for normal video playback
-- Import / Export Settings
-- Current channel quick-add
-- Keyword entry
-- Saved channel and keyword lists
-
-Exported settings include extension mode, language, overlay background, preferred quality, and filter rules. Usage statistics are not included in settings exports.
-
-## Installation
-
-Install the published extension from the [Chrome Web Store](https://chromewebstore.google.com/detail/youtube-audio-mode/chjcfgfdkjkodkjcmooholonanhldeeh).
-
-Manual installation for development:
+## Development setup
 
 1. Clone or download this repository.
 2. Open Chrome and go to `chrome://extensions/`.
-3. Enable **Developer mode**.
-4. Click **Load unpacked**.
-5. Select this repository folder.
+3. Turn on **Developer mode**.
+4. Click **Load unpacked** and select the repository folder.
 
-## How To Use
+After you change a file, click the reload button on the Earmode card in `chrome://extensions/` and reload the YouTube tab.
 
-1. Open any YouTube video.
-2. Click the **YouTube Audio Mode** extension icon.
-3. Pick **Always On**, **Filtered**, or **Off**.
-4. In Filtered mode, click **Configure Filters** to add channels or keywords.
-5. Use Settings to change preferred quality, overlay background, or import/export settings.
+## Tests
 
-## Data Usage Estimates
+The tests use Node's built-in test runner, so there is nothing to install:
 
-The popup estimates savings using average bitrate values:
+```
+node --test tests/
+```
 
-- **144p audio mode:** about 0.75 MB/min
-- **720p video:** about 18.75 MB/min
-- **1080p video:** about 33.75 MB/min
+## Project layout
 
-These numbers are estimates and can vary by video, codec, and network conditions.
+- `manifest.json`: extension manifest (Manifest V3)
+- `background.js`: service worker and toolbar badge
+- `content.js`: runs on YouTube; quality switching, list matching and the player looks
+- `player-menu.js`, `player-menu.css`: the Earmode button and menu on the player
+- `overlay.css`: styles for the player looks
+- `popup.html`, `popup.js`, `popup.css`: the toolbar popup
+- `options.html`, `options.js`, `options.css`: the settings page
+- `shared.js`: helpers shared by the popup and the settings page
+- `_locales/`: English and Arabic text
+- `fonts/`: bundled Fredoka, Nunito Sans and Cairo fonts (SIL OFL 1.1)
+- `tests/`: unit tests
+
+## Data use estimates
+
+Saved data is an estimate based on average bitrates: about 0.75 MB per minute at 144p, 18.75 MB per minute at 720p and 33.75 MB per minute at 1080p. Real numbers change with the video, the codec and your network.
 
 ## Privacy
 
-This extension does not collect personal data. Settings are stored with the Chrome Storage API, and usage statistics are stored locally. See [PRIVACY_POLICY.md](PRIVACY_POLICY.md) for details.
-
-## Development
-
-Project structure:
-
-- `manifest.json` - Chrome extension manifest
-- `background.js` - service worker and badge handling
-- `content.js` - YouTube page behavior, quality switching, filter matching, overlay logic
-- `popup.html`, `popup.js`, `popup.css` - popup UI and settings
-- `overlay.css` - audio-mode overlay styles
-- `_locales/` - English and Arabic translations
-
-Tech stack:
-
-- HTML, CSS, JavaScript
-- Chrome Extension API
-- Manifest V3
+Earmode does not collect any personal data. Settings, your list and stats are kept with Chrome's storage API in your browser. Settings and your list use Chrome sync storage, so they follow you to your other browsers when Chrome sync is on. See [PRIVACY_POLICY.md](PRIVACY_POLICY.md).
 
 ## License
 
-This project is licensed under the MIT License.
+MIT License.
 
 Original extension by [Ahmed Adli](https://github.com/devahmedadli).
-Fork enhancements by [Khaled Ahmed Elsayed](https://github.com/khaledahmedelsayed).
+Earmode by [Khaled Ahmed Elsayed](https://github.com/khaledahmedelsayed).

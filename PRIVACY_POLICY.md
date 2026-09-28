@@ -1,81 +1,84 @@
-# Privacy Policy - YouTube Audio Mode
+# Privacy Policy - Earmode: Audio Only for YouTube
 
-**Last Updated: December 16, 2024**
+**Last Updated: September 28, 2026**
 
 ## Overview
 
-YouTube Audio Mode is committed to protecting your privacy. This extension does NOT collect, store, or transmit any personal information.
+Earmode (formerly YouTube Audio Mode) does not collect, sell or send any personal information. It has no account, no analytics and no server of its own.
 
 ## Data Collection
 
-**We do NOT collect any personal data.**
+**We do not collect any personal data.**
 
-All extension data is stored locally on your device using Chrome's storage API. Nothing is sent to external servers.
+Everything Earmode saves is kept in your browser with Chrome's storage API. Nothing is sent to us or to anyone else.
 
-## Information Stored Locally
+## Information Stored in Your Browser
 
-The extension stores the following data **on your device only**:
+Earmode stores the following:
 
-- Audio mode ON/OFF preference
-- Theme and appearance settings (background type, colors, custom images)
-- Usage statistics (data saved, listening time, active time)
-- Daily usage logs for statistical purposes
+- Your auto-listen choice (Everything, My list or Nothing)
+- Your list: the channels and title keywords you added
+- Your player look and background color
+- Your preferred video quality for when audio is off
+- Your language choice
+- Usage statistics (estimated data saved, time listened, time active) and the daily logs used to add them up
 
-This data never leaves your computer.
+Settings and your list use `chrome.storage.sync`. If you have Chrome sync turned on, Chrome itself keeps these in step across the browsers signed in to your profile, the same way it syncs other extension settings. Usage statistics use `chrome.storage.local` and stay on the device.
+
+## Images Loaded From YouTube
+
+The Card and Blur player looks show the video's thumbnail. Your browser loads it directly from YouTube's own image server (`i.ytimg.com`), the same way YouTube shows thumbnails on its pages. Earmode does not send anything else with that request and does not see or keep what YouTube receives.
 
 ## Permissions Explained
 
 ### storage
 
-To save your preferences and statistics locally on your device.
+To save your settings, your list and your statistics in your browser.
 
 ### activeTab
 
-To detect when you're on a YouTube video page and allow the extension to work.
+To let the popup reach the YouTube tab you have open, so it can show which video and channel are playing and switch that video between video and audio.
 
 ### scripting
 
-To inject content scripts that control video quality and create the audio visualizer overlay.
+Declared for running Earmode on YouTube watch pages, where it lowers the video quality, covers the player while you listen and adds the Earmode button.
 
-### host_permissions (youtube.com)
+### Host permission (youtube.com/watch)
 
-To access and modify YouTube video pages only. The extension does not work on any other websites.
+To work on YouTube video pages only. Earmode does not run on any other website.
 
 ## Third-Party Services
 
-This extension does **NOT**:
+Earmode does **not**:
 
 - Send data to external servers
 - Use analytics or tracking services
 - Share information with third parties
-- Display advertisements
+- Show advertisements
 - Collect personally identifiable information
 - Track your browsing history
 - Access your Google account
 
 ## Data Security
 
-All data is stored locally using Chrome's encrypted storage API. Your statistics and preferences remain private and secure on your device.
+Your data stays in Chrome's extension storage, which only Earmode can read.
 
-## Changes to Privacy Policy
+## Changes to This Policy
 
-We may update this privacy policy from time to time. Any updates will be posted on the Chrome Web Store listing and in the extension's GitHub repository.
+If this policy changes, the new version will be posted on the Chrome Web Store listing and in the extension's GitHub repository.
 
 ## Contact
 
-For privacy concerns or questions:
+For privacy questions:
 
 - **Email:** khaled.khaledahmed@gmail.com
 - **GitHub:** github.com/khaledahmedelsayed
 
-## Your Rights
+## Your Choices
 
 You can:
 
+- Remove channels and keywords from your list on the settings page at any time
+- Export your settings to a file, or import them back, from the settings page
 - Clear all stored data by removing the extension
-- Reset statistics at any time through Chrome's extension settings
-- View all stored data using Chrome's Developer Tools (Storage tab)
-
----
-
-_This extension respects your privacy and aims to provide a transparent, secure experience._
+- View all stored data using Chrome's Developer Tools

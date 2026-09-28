@@ -32,10 +32,12 @@
                 "https://www.youtube.com/*"
             ],
             "js": [
-                "content.js"
+                "content.js",
+                "player-menu.js"
             ],
             "css": [
-                "overlay.css"
+                "overlay.css",
+                "player-menu.css"
             ],
             "run_at": "document_idle"
         }

@@ -1,6 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { createTimers, loadContentScript } = require('./helpers/load-content');
+const { FakeElement } = require('./helpers/fake-dom');
 
 // Values from the vm context come from another realm; normalize before deepEqual.
 const plain = value => JSON.parse(JSON.stringify(value));
@@ -19,79 +20,6 @@ test('thumbnailUrl only accepts real video ids', () => {
     assert.equal(api.thumbnailUrl(null), null);
     assert.equal(api.thumbnailUrl('dQw4w9WgXcQ'), 'https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg');
 });
-
-// Minimal DOM: enough for the overlay builder (createElement, classes, styles, queries).
-class FakeElement {
-    constructor(tagName, namespace = null) {
-        this.tagName = tagName;
-        this.namespace = namespace;
-        this.children = [];
-        this.parent = null;
-        this.attributes = {};
-        this.dataset = {};
-        this.textContent = '';
-        this.id = '';
-        this.listeners = {};
-        const props = {};
-        this.style = {
-            props,
-            setProperty(name, value) {
-                props[name] = value;
-            },
-            removeProperty(name) {
-                delete props[name];
-            }
-        };
-        const classes = new Set();
-        this.classList = {
-            add: name => classes.add(name),
-            remove: name => classes.delete(name),
-            contains: name => classes.has(name)
-        };
-        this.classes = classes;
-    }
-    get className() {
-        return [...this.classes].join(' ');
-    }
-    set className(value) {
-        this.classes.clear();
-        String(value).split(/\s+/).filter(Boolean).forEach(name => this.classes.add(name));
-    }
-    set innerHTML(_value) {
-        throw new Error('innerHTML must not be used');
-    }
-    setAttribute(name, value) {
-        this.attributes[name] = value;
-        if (name === 'class') this.className = value;
-    }
-    removeAttribute(name) {
-        delete this.attributes[name];
-    }
-    appendChild(child) {
-        child.parent = this;
-        this.children.push(child);
-        return child;
-    }
-    remove() {
-        if (this.parent) {
-            this.parent.children = this.parent.children.filter(child => child !== this);
-            this.parent = null;
-        }
-    }
-    *walk() {
-        for (const child of this.children) {
-            yield child;
-            yield* child.walk();
-        }
-    }
-    querySelector(selector) {
-        const name = selector.replace(/^\./, '');
-        for (const el of this.walk()) {
-            if (el.classes.has(name)) return el;
-        }
-        return null;
-    }
-}
 
 function createFakeVideo() {
     return {

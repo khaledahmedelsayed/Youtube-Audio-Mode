@@ -144,6 +144,9 @@ if (chrome.runtime?.id) {
             // Overlay look
             currentPlayerLook = normalizePlayerLook(result.playerLook);
 
+            // In-player menu (player-menu.js) may have rendered before messages loaded
+            if (typeof renderPlayerMenu === 'function') renderPlayerMenu();
+
             // Apply mode logic
             scheduleModeLogic('initial state', 0);
         });
@@ -1854,6 +1857,9 @@ async function updateOverlayLanguage() {
             audioModeOverlay.removeAttribute('dir');
         }
     }
+
+    // In-player menu (player-menu.js) follows the language too
+    if (typeof renderPlayerMenu === 'function') renderPlayerMenu();
 }
 
 // Handle YouTube's SPA navigation with optimized MutationObserver

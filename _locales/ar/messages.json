@@ -414,5 +414,17 @@
     "switchLabel": {
         "message": "طريقة تشغيل هذا الفيديو",
         "description": "Accessible name of the Video | Audio switch"
+    },
+    "menuThisVideo": {
+        "message": "هذا الفيديو",
+        "description": "Title of the switch block in the in-player menu"
+    },
+    "menuAutoListen": {
+        "message": "استماع تلقائي",
+        "description": "Title of the auto-listen block in the in-player menu"
+    },
+    "menuPlayerLook": {
+        "message": "شكل المشغل",
+        "description": "Title of the player look block in the in-player menu"
     }
 }

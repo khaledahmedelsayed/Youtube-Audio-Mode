@@ -420,16 +420,6 @@ input[type="color"] {
     white-space: nowrap;
 }
 
-.rule-text small {
-    color: var(--ink-soft);
-    font-size: 11px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    direction: ltr;
-    text-align: start;
-}
-
 .empty {
     margin: 0;
     padding: 12px;
@@ -570,6 +560,10 @@ select {
 
 .estimate .row-audio {
     background: var(--surface-2);
+}
+
+.estimate .num {
+    unicode-bidi: isolate;
 }
 
 .estimate .plus {

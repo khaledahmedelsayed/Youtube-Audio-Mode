@@ -148,11 +148,10 @@ function removeButton(name, onClick) {
 /**
  * Build a list row.
  * @param {string} title
- * @param {string} [detail] Small second line
  * @param {HTMLButtonElement} button
  * @returns {HTMLLIElement}
  */
-function ruleRow(title, detail, button) {
+function ruleRow(title, button) {
     const item = document.createElement('li');
     item.className = 'rule';
     const text = document.createElement('span');
@@ -161,11 +160,6 @@ function ruleRow(title, detail, button) {
     bold.textContent = title;
     bold.title = title;
     text.append(bold);
-    if (detail) {
-        const small = document.createElement('small');
-        small.textContent = detail;
-        text.append(small);
-    }
     item.append(text, button);
     return item;
 }
@@ -220,18 +214,31 @@ function renderList() {
     const { channels, keywords } = state.filterRules.whitelist;
 
     els.channelsList.replaceChildren(...channels.map(channel => (
-        ruleRow(channel.name, channel.id, removeButton(channel.name, () => deleteChannel(channel.id)))
+        ruleRow(channel.name, removeButton(channel.name, () => deleteChannel(channel.id)))
     )));
     els.channelsEmpty.hidden = channels.length > 0;
 
     els.keywordsList.replaceChildren(...keywords.map(item => (
-        ruleRow(item.keyword, '', removeButton(item.keyword, () => deleteKeyword(item.keyword)))
+        ruleRow(item.keyword, removeButton(item.keyword, () => deleteKeyword(item.keyword)))
     )));
     els.keywordsEmpty.hidden = keywords.length > 0;
 }
 
 function renderQuality() {
     els.qualitySelect.value = state.quality;
+}
+
+/**
+ * Show a signed amount in a left-to-right span so the sign stays with the number in Arabic.
+ * @param {HTMLElement} el
+ * @param {string} text
+ */
+function setIsolated(el, text) {
+    const span = document.createElement('span');
+    span.dir = 'ltr';
+    span.className = 'num';
+    span.textContent = text;
+    el.replaceChildren(span);
 }
 
 function renderStats() {
@@ -245,8 +252,8 @@ function renderStats() {
     els.usage144.textContent = amount(stats.usage144);
     els.usage720.textContent = amount(stats.usage720);
     els.usage1080.textContent = amount(stats.usage1080);
-    els.saved720.textContent = `+${amount(stats.saved720)}`;
-    els.saved1080.textContent = `+${amount(stats.saved1080)}`;
+    setIsolated(els.saved720, `+${amount(stats.saved720)}`);
+    setIsolated(els.saved1080, `+${amount(stats.saved1080)}`);
 }
 
 function renderLanguage() {
@@ -289,6 +296,14 @@ async function selectLook(look) {
 function previewBackground() {
     els.bgValue.textContent = els.bgColor.value;
     sendToYouTubeTabs({ action: 'updateTheme', backgroundType: 'color', backgroundValue: els.bgColor.value });
+}
+
+/** Undo the live preview when the picker loses focus without saving. */
+function revertBackgroundPreview() {
+    if (els.bgColor.value === state.background) return;
+    els.bgColor.value = state.background;
+    els.bgValue.textContent = state.background;
+    sendToYouTubeTabs({ action: 'updateTheme', backgroundType: 'color', backgroundValue: state.background });
 }
 
 /** Save the picked colour once the picker closes. */
@@ -378,13 +393,12 @@ function selectRange(range) {
 }
 
 /**
+ * Save the language; the storage listener applies it to the page.
  * @param {string} lang
  */
 async function selectLanguage(lang) {
     if (!VALID_LANGUAGES.has(lang) || lang === getLanguage()) return;
     if (!await saveSync({ language: lang })) return;
-    await applyLanguage(lang);
-    render();
     sendToYouTubeTabs({ action: 'updateLanguage', language: lang });
 }
 
@@ -405,15 +419,14 @@ async function exportSettings() {
 }
 
 /**
+ * Write the validated settings; the storage listener updates the page.
  * @param {File} file
  */
 async function importSettings(file) {
     const settings = validateImportedSettings(JSON.parse(await file.text()));
     await chrome.storage.sync.set(settings);
-    await loadSettings();
 
     if (settings.language) {
-        await applyLanguage(settings.language);
         sendToYouTubeTabs({ action: 'updateLanguage', language: settings.language });
     }
     if (settings.backgroundType) {
@@ -423,7 +436,6 @@ async function importSettings(file) {
             backgroundValue: settings.backgroundValue
         });
     }
-    render();
     showToast(t('settingsImported'));
 }
 
@@ -474,6 +486,7 @@ els.lookButtons.forEach(button => {
 });
 els.bgColor.addEventListener('input', previewBackground);
 els.bgColor.addEventListener('change', saveBackground);
+els.bgColor.addEventListener('blur', revertBackgroundPreview);
 els.keywordAdd.addEventListener('click', submitKeyword);
 els.keywordInput.addEventListener('keydown', event => {
     if (event.key === 'Enter' && !event.isComposing) {
@@ -523,12 +536,16 @@ chrome.storage.onChanged.addListener(async (changes, namespace) => {
             state.quality = VALID_QUALITY_VALUES.has(quality) ? quality : DEFAULT_QUALITY;
         }
         if (changes.backgroundType || changes.backgroundValue) {
-            const { backgroundType, backgroundValue } = await chrome.storage.sync.get(['backgroundType', 'backgroundValue']);
-            state.background = backgroundFrom(backgroundType, backgroundValue);
+            const type = changes.backgroundType ? changes.backgroundType.newValue : 'color';
+            const value = changes.backgroundValue ? changes.backgroundValue.newValue : state.background;
+            state.background = backgroundFrom(type, value);
         }
         const lang = changes.language?.newValue;
         if (VALID_LANGUAGES.has(lang) && lang !== getLanguage()) await applyLanguage(lang);
         render();
+    } else if (namespace === 'session' && changes.optionsSection?.newValue) {
+        // The popup asked for a section while this page was already open
+        openRequestedSection();
     } else if (namespace === 'local' && (changes.statsLogs || changes.activeLogs)) {
         if (changes.statsLogs) state.statsLogs = changes.statsLogs.newValue || {};
         if (changes.activeLogs) state.activeLogs = changes.activeLogs.newValue || {};

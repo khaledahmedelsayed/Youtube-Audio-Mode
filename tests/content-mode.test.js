@@ -204,3 +204,32 @@ test('clearOverride in filtered mode keeps the last list decision', async () => 
     api.clearOverride();
     assert.equal(api.getEarmodeStatus().reason, 'notInList');
 });
+
+/**
+ * Send a runtime message to content.js the way the popup or options page would
+ * @returns {{ returned: *, responses: object[] }}
+ */
+function sendMessage(api, request) {
+    const responses = [];
+    const [listener] = api.context.chrome.runtime.onMessage.listeners;
+    const returned = listener(request, {}, response => responses.push(plain(response)));
+    return { returned, responses };
+}
+
+test('message listener keeps the channel open only for async replies', () => {
+    const api = loadContentScript(createTimers());
+
+    const theme = sendMessage(api, { action: 'updateTheme', backgroundType: 'color', backgroundValue: '#123456' });
+    assert.notEqual(theme.returned, true);
+    assert.deepEqual(theme.responses, [{ ok: true }]);
+
+    const status = sendMessage(api, { action: 'getStatus' });
+    assert.notEqual(status.returned, true);
+    assert.equal(status.responses[0].onVideo, true);
+
+    const unknown = sendMessage(api, { action: 'nothingHere' });
+    assert.notEqual(unknown.returned, true);
+
+    const language = sendMessage(api, { action: 'updateLanguage', language: 'ar' });
+    assert.equal(language.returned, true);
+});

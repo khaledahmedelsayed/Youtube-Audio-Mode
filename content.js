@@ -826,6 +826,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         sendResponse({ ok: true });
     } else if (request.action === 'updateTheme') {
         updateOverlayTheme(request.backgroundType, request.backgroundValue);
+        sendResponse({ ok: true });
     } else if (request.action === 'playerLookChanged') {
         setPlayerLook(request.look);
         sendResponse({ ok: true });
@@ -840,7 +841,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     } else if (request.action === 'getVideoInfo') {
         sendResponse(getCurrentVideoInfo());
     }
-    return true;
+    return false;
 });
 
 // Listen for storage changes to re-apply mode logic

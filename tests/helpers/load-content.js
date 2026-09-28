@@ -102,7 +102,10 @@ function loadContentScript(timers, { extraScripts = [] } = {}) {
                     return Promise.reject(new Error('Could not establish connection. Receiving end does not exist.'));
                 },
                 onMessage: {
-                    addListener() {}
+                    listeners: [],
+                    addListener(fn) {
+                        this.listeners.push(fn);
+                    }
                 }
             },
             storage: {

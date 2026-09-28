@@ -185,3 +185,38 @@ test('image background also feeds --em-bg', async () => {
     api.updateOverlayTheme('image', 'https://example.com/a.png');
     assert.equal(api.getOverlayForTest().style.props['--em-bg'], 'url("https://example.com/a.png")');
 });
+
+const fireSyncChange = (api, changes) => {
+    api.context.chrome.storage.onChanged.listeners.forEach(fn => fn(changes, 'sync'));
+};
+
+test('language change in storage updates the overlay and the player menu', async () => {
+    const api = loadContentScript(createTimers());
+    setupOverlayDom(api);
+    await api.createAudioModeOverlay();
+    let menuRenders = 0;
+    api.context.renderPlayerMenu = () => menuRenders++;
+
+    fireSyncChange(api, { language: { newValue: 'ar' } });
+    await new Promise(resolve => setImmediate(resolve));
+
+    assert.equal(require('node:vm').runInContext('currentLanguage', api.context), 'ar');
+    assert.equal(api.getOverlayForTest().getAttribute('dir'), 'rtl');
+    assert.equal(menuRenders, 1);
+});
+
+test('background change in storage updates the overlay theme', async () => {
+    const api = loadContentScript(createTimers());
+    setupOverlayDom(api);
+    await api.createAudioModeOverlay();
+    const overlay = api.getOverlayForTest();
+
+    fireSyncChange(api, { backgroundType: { newValue: 'color' }, backgroundValue: { newValue: '#abcdef' } });
+    assert.equal(overlay.style.props['--em-bg'], '#abcdef');
+
+    // Only the value changed: the type comes from storage
+    api.context.chrome.storage.sync.get = (keys, callback) => callback({ backgroundType: 'image', backgroundValue: 'https://example.com/old.png' });
+    fireSyncChange(api, { backgroundValue: { newValue: 'https://example.com/b.png' } });
+    assert.equal(overlay.style.props['--em-bg'], 'url("https://example.com/b.png")');
+    assert.equal(overlay.classList.contains('has-image'), true);
+});

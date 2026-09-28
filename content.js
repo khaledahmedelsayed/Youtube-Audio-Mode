@@ -869,6 +869,24 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
         if (changes.playerLook) {
             setPlayerLook(changes.playerLook.newValue);
         }
+
+        if (changes.language) {
+            // Same as the updateLanguage message, for tabs the sender did not reach
+            currentLanguage = changes.language.newValue
+                || (chrome.i18n.getUILanguage().startsWith('ar') ? 'ar' : 'en');
+            updateOverlayLanguage().catch(error => {
+                console.error('[Earmode] Could not update language:', error);
+            });
+        }
+
+        if (changes.backgroundType || changes.backgroundValue) {
+            // One key may change alone; read the other from storage
+            chrome.storage.sync.get(['backgroundType', 'backgroundValue'], result => {
+                const type = changes.backgroundType ? changes.backgroundType.newValue : result.backgroundType;
+                const value = changes.backgroundValue ? changes.backgroundValue.newValue : result.backgroundValue;
+                updateOverlayTheme(type, value);
+            });
+        }
     }
 });
 

@@ -262,5 +262,141 @@
   "settingsImportFailed": {
     "message": "Could not import settings",
     "description": "Toast message when importing settings fails"
+  },
+  "switchVideo": {
+    "message": "Video",
+    "description": "Left half of the main switch: play the full video"
+  },
+  "switchAudio": {
+    "message": "Audio",
+    "description": "Right half of the main switch: listen only"
+  },
+  "switchVideoSub": {
+    "message": "Full picture",
+    "description": "Small text under Video on the switch"
+  },
+  "switchAudioSub": {
+    "message": "144p, saves data",
+    "description": "Small text under Audio on the switch"
+  },
+  "nowAudio": {
+    "message": "Audio only",
+    "description": "Pill showing the current video is playing as audio"
+  },
+  "nowVideo": {
+    "message": "Video",
+    "description": "Pill showing the current video is playing as video"
+  },
+  "reasonManual": {
+    "message": "because you picked it for this video",
+    "description": "Why: the user chose for this video"
+  },
+  "reasonAll": {
+    "message": "because Auto is set to Everything",
+    "description": "Why: auto-listen is Everything"
+  },
+  "reasonInList": {
+    "message": "because this channel is in your list",
+    "description": "Why: channel is in the list"
+  },
+  "reasonNotInList": {
+    "message": "because this channel is not in your list",
+    "description": "Why: channel is not in the list"
+  },
+  "reasonNone": {
+    "message": "because Auto is set to Nothing",
+    "description": "Why: auto-listen is Nothing"
+  },
+  "backToAuto": {
+    "message": "Back to auto",
+    "description": "Link that removes the choice for this video"
+  },
+  "alwaysListen": {
+    "message": "+ Always listen",
+    "description": "Button that adds the channel to the list"
+  },
+  "inYourList": {
+    "message": "✓ In your list",
+    "description": "Button state when the channel is in the list"
+  },
+  "autoListenLabel": {
+    "message": "Auto-listen for new videos",
+    "description": "Title above the auto-listen choices"
+  },
+  "modeEverything": {
+    "message": "Everything",
+    "description": "Auto-listen choice: every video"
+  },
+  "modeMyList": {
+    "message": "My list",
+    "description": "Auto-listen choice: channels in the list"
+  },
+  "modeNothing": {
+    "message": "Nothing",
+    "description": "Auto-listen choice: no video"
+  },
+  "hintEverything": {
+    "message": "Every video starts as audio.",
+    "description": "Hint under Everything"
+  },
+  "hintMyList": {
+    "message": "{count} channels in your list.",
+    "description": "Hint under My list. {count} is the number of channels"
+  },
+  "hintMyListOne": {
+    "message": "1 channel in your list.",
+    "description": "Hint under My list when there is exactly one channel"
+  },
+  "hintNothing": {
+    "message": "Videos start as normal video.",
+    "description": "Hint under Nothing"
+  },
+  "playerLookLabel": {
+    "message": "Player look while listening",
+    "description": "Title above the player look tiles"
+  },
+  "lookCard": {
+    "message": "Card",
+    "description": "Player look name"
+  },
+  "lookBlur": {
+    "message": "Blur",
+    "description": "Player look name"
+  },
+  "lookSimple": {
+    "message": "Simple",
+    "description": "Player look name"
+  },
+  "lookWaves": {
+    "message": "Waves",
+    "description": "Player look name"
+  },
+  "savedThisMonth": {
+    "message": "Saved {amount} this month",
+    "description": "Stats line. {amount} is like 2.3 GB"
+  },
+  "noVideoSwitch": {
+    "message": "Open a YouTube video to use the switch.",
+    "description": "Shown when the active tab is not a YouTube video"
+  },
+  "addedToList": {
+    "message": "Added to your list",
+    "description": "Toast after adding a channel"
+  },
+  "removedFromList": {
+    "message": "Removed from your list",
+    "description": "Toast after removing a channel"
+  },
+  "reloadTab": {
+    "message": "Reload the YouTube tab to use Earmode.",
+    "description": "Shown when the content script does not answer"
+  },
+  "settingsLabel": {
+    "message": "Settings",
+    "description": "Tooltip and label of the gear button"
+  },
+  "languageLabel": {
+    "message": "Language",
+    "description": "Tooltip and label of the language button"
   }
 }

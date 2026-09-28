@@ -266,5 +266,141 @@
     "settingsImportFailed": {
         "message": "تعذر استيراد الإعدادات",
         "description": "Toast message when importing settings fails"
+    },
+    "switchVideo": {
+        "message": "فيديو",
+        "description": "Left half of the main switch: play the full video"
+    },
+    "switchAudio": {
+        "message": "صوت",
+        "description": "Right half of the main switch: listen only"
+    },
+    "switchVideoSub": {
+        "message": "الصورة كاملة",
+        "description": "Small text under Video on the switch"
+    },
+    "switchAudioSub": {
+        "message": "144p، يوفر البيانات",
+        "description": "Small text under Audio on the switch"
+    },
+    "nowAudio": {
+        "message": "صوت فقط",
+        "description": "Pill showing the current video is playing as audio"
+    },
+    "nowVideo": {
+        "message": "فيديو",
+        "description": "Pill showing the current video is playing as video"
+    },
+    "reasonManual": {
+        "message": "لأنك اخترته لهذا الفيديو",
+        "description": "Why: the user chose for this video"
+    },
+    "reasonAll": {
+        "message": "لأن التلقائي مضبوط على الكل",
+        "description": "Why: auto-listen is Everything"
+    },
+    "reasonInList": {
+        "message": "لأن هذه القناة في قائمتك",
+        "description": "Why: channel is in the list"
+    },
+    "reasonNotInList": {
+        "message": "لأن هذه القناة ليست في قائمتك",
+        "description": "Why: channel is not in the list"
+    },
+    "reasonNone": {
+        "message": "لأن التلقائي مضبوط على لا شيء",
+        "description": "Why: auto-listen is Nothing"
+    },
+    "backToAuto": {
+        "message": "العودة للتلقائي",
+        "description": "Link that removes the choice for this video"
+    },
+    "alwaysListen": {
+        "message": "+ استمع دائمًا",
+        "description": "Button that adds the channel to the list"
+    },
+    "inYourList": {
+        "message": "✓ في قائمتك",
+        "description": "Button state when the channel is in the list"
+    },
+    "autoListenLabel": {
+        "message": "استماع تلقائي للفيديوهات الجديدة",
+        "description": "Title above the auto-listen choices"
+    },
+    "modeEverything": {
+        "message": "الكل",
+        "description": "Auto-listen choice: every video"
+    },
+    "modeMyList": {
+        "message": "قائمتي",
+        "description": "Auto-listen choice: channels in the list"
+    },
+    "modeNothing": {
+        "message": "لا شيء",
+        "description": "Auto-listen choice: no video"
+    },
+    "hintEverything": {
+        "message": "كل فيديو يبدأ بالصوت.",
+        "description": "Hint under Everything"
+    },
+    "hintMyList": {
+        "message": "{count} قناة في قائمتك.",
+        "description": "Hint under My list. {count} is the number of channels"
+    },
+    "hintMyListOne": {
+        "message": "قناة واحدة في قائمتك.",
+        "description": "Hint under My list when there is exactly one channel"
+    },
+    "hintNothing": {
+        "message": "الفيديوهات تبدأ بالفيديو العادي.",
+        "description": "Hint under Nothing"
+    },
+    "playerLookLabel": {
+        "message": "شكل المشغل أثناء الاستماع",
+        "description": "Title above the player look tiles"
+    },
+    "lookCard": {
+        "message": "بطاقة",
+        "description": "Player look name"
+    },
+    "lookBlur": {
+        "message": "ضبابي",
+        "description": "Player look name"
+    },
+    "lookSimple": {
+        "message": "بسيط",
+        "description": "Player look name"
+    },
+    "lookWaves": {
+        "message": "موجات",
+        "description": "Player look name"
+    },
+    "savedThisMonth": {
+        "message": "وفّرت {amount} هذا الشهر",
+        "description": "Stats line. {amount} is like 2.3 GB"
+    },
+    "noVideoSwitch": {
+        "message": "افتح فيديو على يوتيوب لاستخدام المفتاح.",
+        "description": "Shown when the active tab is not a YouTube video"
+    },
+    "addedToList": {
+        "message": "أُضيفت إلى قائمتك",
+        "description": "Toast after adding a channel"
+    },
+    "removedFromList": {
+        "message": "حُذفت من قائمتك",
+        "description": "Toast after removing a channel"
+    },
+    "reloadTab": {
+        "message": "أعد تحميل صفحة يوتيوب لاستخدام Earmode.",
+        "description": "Shown when the content script does not answer"
+    },
+    "settingsLabel": {
+        "message": "الإعدادات",
+        "description": "Tooltip and label of the gear button"
+    },
+    "languageLabel": {
+        "message": "اللغة",
+        "description": "Tooltip and label of the language button"
     }
 }

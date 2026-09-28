@@ -1,757 +1,419 @@
-// Popup script for YouTube Audio Mode extension
-
-const modeAlwaysBtn = document.getElementById('mode-always');
-const modeFilteredBtn = document.getElementById('mode-filtered');
-const modeOffBtn = document.getElementById('mode-off');
-const configureFiltersBtn = document.getElementById('configure-filters-btn');
-const langBtn = document.getElementById('lang-btn');
-const settingsBtn = document.getElementById('settings-btn');
+// Earmode popup: the Video | Audio switch, auto-listen mode, player look and a stats line.
+// Depends on shared.js (globalThis.Earmode).
 
 const {
     t,
     loadMessages,
-    DEFAULT_BACKGROUND_COLOR,
-    SETTINGS_EXPORT_KEYS,
-    validateImportedSettings,
-    buildExportPayload,
-    exportFileName
+    getLanguage,
+    VALID_MODE_TYPES,
+    VALID_LANGUAGES,
+    PLAYER_LOOKS,
+    getDefaultFilterRules,
+    sanitizeFilterRules,
+    sumMonthSeconds,
+    savedMegabytes,
+    formatSavedAmount,
+    fillTemplate,
+    videoChannels,
+    channelsInList,
+    toggleChannels
 } = globalThis.Earmode;
 
-// Current audio mode type: 'always', 'filtered', or 'off'
-let currentModeType = 'always';
+const MAX_RETRIES = 3;
+const RETRY_DELAY_MS = 800;
+const SWITCH_REFRESH_MS = 300;
+const RULES_REFRESH_MS = 600;
+const TOAST_MS = 1800;
 
-// Current language
-let currentLang = 'en';
+const REASON_KEYS = {
+    manual: 'reasonManual',
+    all: 'reasonAll',
+    inList: 'reasonInList',
+    notInList: 'reasonNotInList',
+    none: 'reasonNone'
+};
 
-async function setLanguage(lang) {
-    // Load messages for the selected language
+const HINT_KEYS = {
+    always: 'hintEverything',
+    off: 'hintNothing'
+};
+
+const $ = id => document.getElementById(id);
+
+const els = {
+    langBtn: $('lang-btn'),
+    gearBtn: $('gear-btn'),
+    switchBox: $('switch'),
+    switchButtons: [$('switch-video'), $('switch-audio')],
+    statePill: $('state-pill'),
+    stateText: $('state-text'),
+    backToAuto: $('back-to-auto'),
+    channel: $('channel'),
+    channelAvatar: $('channel-avatar'),
+    channelName: $('channel-name'),
+    channelAdd: $('channel-add'),
+    modeButtons: [...document.querySelectorAll('#mode-seg button')],
+    modeHint: $('mode-hint'),
+    lookButtons: [...document.querySelectorAll('#looks .look')],
+    stats: $('stats'),
+    statsText: $('stats-text'),
+    statsGo: $('stats-go'),
+    toast: $('toast')
+};
+
+/**
+ * Popup state. `tab` is the active tab; `onWatch` is true for youtube.com/watch URLs.
+ * `status` comes from the content script's getStatus; `contentMissing` is set when it never answers.
+ */
+const state = {
+    tab: null,
+    onWatch: false,
+    status: null,
+    contentMissing: false,
+    videoInfo: null,
+    mode: 'always',
+    look: 'card',
+    filterRules: getDefaultFilterRules(),
+    statsLogs: {}
+};
+
+let statusRefreshTimer = null;
+let toastTimer = null;
+
+// ---------- messaging ----------
+
+/**
+ * Send a message to the active tab's content script.
+ * @param {object} message
+ * @returns {Promise<*>} The response, or undefined when nothing answers.
+ */
+async function sendToTab(message) {
+    if (!state.tab?.id) return undefined;
+    try {
+        return await chrome.tabs.sendMessage(state.tab.id, message);
+    } catch (error) {
+        return undefined;
+    }
+}
+
+/**
+ * Send a message, retrying while the response is not complete yet (page still loading).
+ * @param {object} message
+ * @param {function(*): boolean} isComplete
+ * @returns {Promise<*>} The last response received.
+ */
+async function sendWithRetry(message, isComplete) {
+    let response;
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+        if (attempt > 0) await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
+        response = await sendToTab(message);
+        if (isComplete(response)) return response;
+    }
+    return response;
+}
+
+/**
+ * Ask the content script for the current status and re-render.
+ */
+async function refreshStatus() {
+    if (!state.onWatch) return;
+    const status = await sendToTab({ action: 'getStatus' });
+    if (status) {
+        state.status = status;
+        state.contentMissing = false;
+        render();
+    }
+}
+
+/**
+ * Re-query status after a delay, collapsing repeated calls into one.
+ * @param {number} delay
+ */
+function scheduleStatusRefresh(delay) {
+    clearTimeout(statusRefreshTimer);
+    statusRefreshTimer = setTimeout(refreshStatus, delay);
+}
+
+// ---------- language ----------
+
+/**
+ * Load messages for a language, set direction and fill every [data-i18n] element.
+ * @param {string} lang
+ */
+async function applyLanguage(lang) {
     await loadMessages(lang);
-    currentLang = lang;
+    const current = getLanguage();
+    const isArabic = current === 'ar';
 
-    // Update direction
-    document.body.dir = lang === 'ar' ? 'rtl' : 'ltr';
+    document.documentElement.lang = current;
+    document.body.dir = isArabic ? 'rtl' : 'ltr';
 
-    // Update button text
-    langBtn.textContent = lang === 'ar' ? 'En' : 'ع';
-    langBtn.title = lang === 'ar' ? 'English' : 'Arabic';
-
-    // Update all elements with data-i18n
     document.querySelectorAll('[data-i18n]').forEach(el => {
-        const key = el.getAttribute('data-i18n');
-        const translation = t(key);
-        if (translation) {
-            el.textContent = translation;
-        }
+        el.textContent = t(el.getAttribute('data-i18n'));
     });
 
-    // Refresh stats to apply new units
-    updateStats();
-
-    // Save preference
-    chrome.storage.sync.set({ language: lang });
-
-    // Broadcast to active tab (for overlay)
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        if (tabs[0] && tabs[0].url.includes('youtube.com')) {
-            chrome.tabs.sendMessage(tabs[0].id, {
-                action: 'updateLanguage',
-                language: lang
-            }).catch(() => {
-                // Ignore errors if content script is not ready
-            });
-        }
-    });
+    els.langBtn.textContent = isArabic ? 'EN' : 'ع';
+    els.langBtn.title = t('languageLabel');
+    els.langBtn.setAttribute('aria-label', t('languageLabel'));
+    els.gearBtn.title = t('settingsLabel');
+    els.gearBtn.setAttribute('aria-label', t('settingsLabel'));
+    els.statsGo.textContent = isArabic ? '‹' : '›';
 }
 
-// Initialize Language
-chrome.storage.sync.get(['language'], (result) => {
-    // Use stored language preference, or detect from browser
-    const detectedLang = chrome.i18n.getUILanguage().startsWith('ar') ? 'ar' : 'en';
-    setLanguage(result.language || detectedLang);
-});
+// ---------- rendering ----------
 
-
-// Language Toggle Handler
-langBtn.addEventListener('click', () => {
-    const newLang = currentLang === 'en' ? 'ar' : 'en';
-    setLanguage(newLang);
-});
-
-// Initialize popup state - load saved mode type
-chrome.storage.sync.get(['audioModeType'], (result) => {
-    currentModeType = result.audioModeType || 'always';
-    updateModeUI(currentModeType);
-});
-
-// Update mode selector UI
-function updateModeUI(mode) {
-    // Remove active from all mode buttons
-    modeAlwaysBtn.classList.remove('active');
-    modeFilteredBtn.classList.remove('active');
-    modeOffBtn.classList.remove('active');
-
-    // Set active on selected mode and show/hide configure button
-    if (mode === 'always') {
-        modeAlwaysBtn.classList.add('active');
-        configureFiltersBtn.classList.add('hidden');
-    } else if (mode === 'filtered') {
-        modeFilteredBtn.classList.add('active');
-        configureFiltersBtn.classList.remove('hidden');
-    } else {
-        // 'off' mode
-        modeOffBtn.classList.add('active');
-        configureFiltersBtn.classList.add('hidden');
-    }
+/**
+ * Pick a stable avatar colour from a channel name.
+ * @param {string} name
+ * @returns {string}
+ */
+function avatarColor(name) {
+    let hash = 0;
+    for (const char of name) hash = (hash * 31 + char.codePointAt(0)) >>> 0;
+    return `hsl(${hash % 360}, 55%, 45%)`;
 }
 
-// Handle mode selection
-function selectMode(mode) {
-    if (mode === currentModeType) return;
+function renderSwitch() {
+    const enabled = state.onWatch && !!state.status?.onVideo;
+    const on = enabled && state.status.audio === true;
 
-    currentModeType = mode;
-    updateModeUI(mode);
-
-    // Save to storage
-    chrome.storage.sync.set({ audioModeType: mode });
-
-    // Notify content script about mode change
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        const currentTab = tabs[0];
-        if (currentTab?.url?.includes('youtube.com')) {
-            chrome.tabs.sendMessage(currentTab.id, {
-                action: 'modeChanged',
-                mode: mode
-            }).catch(() => {
-                // Content script not ready, will pick up from storage
-            });
-        }
+    els.switchBox.dataset.on = String(on);
+    els.switchBox.dataset.disabled = String(!enabled);
+    els.switchButtons.forEach(button => {
+        const isAudio = button.dataset.audio === 'true';
+        button.disabled = !enabled;
+        button.setAttribute('aria-pressed', String(enabled && isAudio === on));
     });
 }
 
-// Mode button click handlers
-modeAlwaysBtn.addEventListener('click', () => selectMode('always'));
-modeFilteredBtn.addEventListener('click', () => selectMode('filtered'));
-modeOffBtn.addEventListener('click', () => selectMode('off'));
-
-// Configure filters button opens the filter panel
-configureFiltersBtn.addEventListener('click', () => {
-    openSettingsPanel({ scrollToFilters: true });
-});
-
-// Stats Update Logic
-let currentFilter = 'month'; // 'month' or 'all'
-
-const filterBtns = document.querySelectorAll('.stats-filter');
-filterBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-        filterBtns.forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        currentFilter = btn.dataset.filter;
-        updateStats();
-    });
-});
-
-function updateStats() {
-    try {
-        // Get both logs
-        chrome.storage.local.get(['statsLogs', 'activeLogs', 'audioModeSeconds'], (result) => {
-            const statsLogs = result.statsLogs || {};
-            const activeLogs = result.activeLogs || {};
-
-            // Legacy support: if we have audioModeSeconds but no logs, maybe credit it to today?
-            // Or just ignore legacy data for the new accurate system. 
-            // Let's rely on new logs.
-
-            const now = new Date();
-            const currentMonthPrefix = now.toISOString().slice(0, 7); // YYYY-MM
-
-            let totalListenedSeconds = 0;
-            let totalActiveSeconds = 0;
-
-            // Aggregate Listened Time (Accurate Playback)
-            Object.entries(statsLogs).forEach(([date, seconds]) => {
-                if (currentFilter === 'month') {
-                    if (date.startsWith(currentMonthPrefix)) {
-                        totalListenedSeconds += seconds;
-                    }
-                } else {
-                    totalListenedSeconds += seconds;
-                }
-            });
-
-            // Aggregate Active Time (Wall Clock)
-            Object.entries(activeLogs).forEach(([date, seconds]) => {
-                if (currentFilter === 'month') {
-                    if (date.startsWith(currentMonthPrefix)) {
-                        totalActiveSeconds += seconds;
-                    }
-                } else {
-                    totalActiveSeconds += seconds;
-                }
-            });
-
-            // Calculate Data
-            const listenedMinutes = totalListenedSeconds / 60;
-
-            // Data Rates (MB per minute)
-            const RATE_144P = 0.75;
-            const RATE_720P = 18.75;
-            const RATE_1080P = 33.75;
-
-            const usage144p = listenedMinutes * RATE_144P;
-            const usage720p = listenedMinutes * RATE_720P;
-            const usage1080p = listenedMinutes * RATE_1080P;
-
-            const savedVs720p = usage720p - usage144p;
-            const savedVs1080p = usage1080p - usage144p;
-
-            // Update UI
-            const dataSavedElement = document.getElementById('data-saved-value');
-            const listenedTimeElement = document.getElementById('listened-time-value');
-            const activeTimeElement = document.getElementById('active-time-value');
-
-            if (dataSavedElement) {
-                dataSavedElement.textContent = formatData(savedVs720p);
-            }
-
-            if (listenedTimeElement) {
-                listenedTimeElement.textContent = formatTime(totalListenedSeconds);
-            }
-
-            if (activeTimeElement) {
-                activeTimeElement.textContent = formatTime(totalActiveSeconds);
-            }
-
-            // Update Table (Comparison uses statsLogs data mainly)
-            updateTableVal('usage-144p', usage144p);
-            updateTableVal('usage-720p', usage720p);
-            updateTableVal('saved-720p', savedVs720p, true);
-            updateTableVal('usage-1080p', usage1080p);
-            updateTableVal('saved-1080p', savedVs1080p, true);
-        });
-    } catch (error) {
-        console.error('[Audio Mode] Error updating stats:', error);
-    }
-}
-
-function formatTime(seconds) {
-    const s = Math.floor(seconds % 60);
-    const m = Math.floor((seconds / 60) % 60);
-    const h = Math.floor(seconds / 3600);
-
-    const timeH = t('timeH');
-    const timeM = t('timeM');
-    const timeS = t('timeS');
-
-    if (h > 0) return `${h}${timeH} ${m}${timeM}`;
-    if (m > 0) return `${m}${timeM} ${s}${timeS}`;
-    return `${s}${timeS}`;
-}
-
-function updateTableVal(id, mbValue, isSavings = false) {
-    const el = document.getElementById(id);
-    if (!el) return;
-
-    // Add + or - sign if it's a savings/diff value
-    const prefix = isSavings ? '+' : '';
-    el.textContent = `${prefix}${formatData(mbValue)}`;
-}
-
-function formatData(mb) {
-    const unitGB = t('unitGB');
-    const unitMB = t('unitMB');
-    if (mb >= 1024) {
-        return `${(mb / 1024).toFixed(2)}${unitGB}`;
-    }
-    return `${Math.round(mb)}${unitMB}`;
-}
-
-// Update stats immediately
-updateStats();
-
-// Listen for storage changes instead of polling
-chrome.storage.onChanged.addListener((changes, namespace) => {
-    if (namespace === 'local' && (changes.statsLogs || changes.activeLogs)) {
-        updateStats();
-    }
-});
-
-
-// --- Quality Selector Logic ---
-const audioBgColorPicker = document.getElementById('audio-bg-color-picker');
-const audioBgColorValue = document.getElementById('audio-bg-color-value');
-const qualitySelect = document.getElementById('quality-select');
-const exportSettingsBtn = document.getElementById('export-settings-btn');
-const importSettingsBtn = document.getElementById('import-settings-btn');
-const importSettingsFile = document.getElementById('import-settings-file');
-
-chrome.storage.sync.get(['backgroundType', 'backgroundValue'], (result) => {
-    if (!audioBgColorPicker || !audioBgColorValue) return;
-
-    const value = result.backgroundType === 'color' && result.backgroundValue?.startsWith('#')
-        ? result.backgroundValue
-        : DEFAULT_BACKGROUND_COLOR;
-
-    audioBgColorPicker.value = value;
-    audioBgColorValue.textContent = value;
-});
-
-if (audioBgColorPicker) {
-    audioBgColorPicker.addEventListener('input', (e) => {
-        const color = e.target.value;
-        if (audioBgColorValue) {
-            audioBgColorValue.textContent = color;
-        }
-
-        chrome.storage.sync.set({
-            backgroundType: 'color',
-            backgroundValue: color
-        });
-
-        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-            const currentTab = tabs[0];
-            if (currentTab?.url?.includes('youtube.com')) {
-                chrome.tabs.sendMessage(currentTab.id, {
-                    action: 'updateTheme',
-                    backgroundType: 'color',
-                    backgroundValue: color
-                }).catch(() => {
-                    // Ignore errors if content script is not ready
-                });
-            }
-        });
-    });
-}
-
-// Load saved quality preference
-chrome.storage.sync.get(['preferredQuality'], (result) => {
-    if (result.preferredQuality && qualitySelect) {
-        qualitySelect.value = result.preferredQuality;
-    }
-});
-
-// Save quality preference on change
-if (qualitySelect) {
-    qualitySelect.addEventListener('change', () => {
-        const quality = qualitySelect.value;
-        chrome.storage.sync.set({ preferredQuality: quality });
-    });
-}
-
-function sendMessageToActiveYouTube(message) {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        const currentTab = tabs[0];
-        if (currentTab?.url?.includes('youtube.com')) {
-            chrome.tabs.sendMessage(currentTab.id, message).catch(() => {
-                // Ignore errors if content script is not ready
-            });
-        }
-    });
-}
-
-async function applyImportedSettings(settings) {
-    if (settings.audioModeType) {
-        currentModeType = settings.audioModeType;
-        updateModeUI(currentModeType);
-        sendMessageToActiveYouTube({
-            action: 'modeChanged',
-            mode: currentModeType
-        });
-    }
-
-    if (settings.language) {
-        await setLanguage(settings.language);
-    }
-
-    if (settings.backgroundType === 'color' && settings.backgroundValue) {
-        if (audioBgColorPicker) audioBgColorPicker.value = settings.backgroundValue;
-        if (audioBgColorValue) audioBgColorValue.textContent = settings.backgroundValue;
-        sendMessageToActiveYouTube({
-            action: 'updateTheme',
-            backgroundType: settings.backgroundType,
-            backgroundValue: settings.backgroundValue
-        });
-    }
-
-    if (settings.preferredQuality && qualitySelect) {
-        qualitySelect.value = settings.preferredQuality;
-    }
-
-    if (settings.filterRules) {
-        loadFilterRules();
-        updateQuickAddButtonState();
-    }
-}
-
-async function exportSettings() {
-    const settings = await chrome.storage.sync.get(SETTINGS_EXPORT_KEYS);
-    const payload = buildExportPayload(settings);
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-
-    link.href = url;
-    link.download = exportFileName();
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 0);
-    showToast(t('settingsExported'));
-}
-
-async function importSettings(file) {
-    const text = await file.text();
-    const payload = JSON.parse(text);
-    const settings = validateImportedSettings(payload);
-
-    await chrome.storage.sync.set(settings);
-    await applyImportedSettings(settings);
-    showToast(t('settingsImported'));
-}
-
-if (exportSettingsBtn) {
-    exportSettingsBtn.addEventListener('click', () => {
-        exportSettings().catch(error => {
-            console.error('[Audio Mode] Failed to export settings:', error);
-            showToast(t('settingsExportFailed'));
-        });
-    });
-}
-
-if (importSettingsBtn && importSettingsFile) {
-    importSettingsBtn.addEventListener('click', () => {
-        importSettingsFile.click();
-    });
-
-    importSettingsFile.addEventListener('change', () => {
-        const file = importSettingsFile.files?.[0];
-        importSettingsFile.value = '';
-        if (!file) return;
-
-        importSettings(file).catch(error => {
-            console.error('[Audio Mode] Failed to import settings:', error);
-            showToast(t('settingsImportFailed'));
-        });
-    });
-}
-
-// --- Filter Rules Panel Logic ---
-
-const filterPanel = document.getElementById('filter-panel');
-const closeFilterBtn = document.getElementById('close-filter');
-const quickAddChannelBtn = document.getElementById('quick-add-channel');
-const newRuleInput = document.getElementById('new-rule-input');
-const addRuleBtn = document.getElementById('add-rule-btn');
-
-let currentVideoInfo = null;
-
-function openSettingsPanel(options = {}) {
-    filterPanel.classList.add('open');
-    document.documentElement.classList.add('panel-open');
-    document.body.classList.add('panel-open');
-    loadFilterRules();
-    fetchCurrentVideoInfo();
-
-    if (options.scrollToFilters) {
-        requestAnimationFrame(() => {
-            const settingsContent = filterPanel.querySelector('.settings-content');
-            const filterTarget = document.getElementById('quick-add-section');
-
-            if (!settingsContent || !filterTarget) return;
-
-            settingsContent.scrollTop = filterTarget.offsetTop - settingsContent.offsetTop;
-        });
-    }
-}
-
-settingsBtn.addEventListener('click', () => {
-    openSettingsPanel();
-});
-
-function getCurrentVideoChannels() {
-    if (!currentVideoInfo) return [];
-
-    const channels = Array.isArray(currentVideoInfo.channels) ? currentVideoInfo.channels : [];
-    const primaryChannel = currentVideoInfo.channelId
-        ? [{ id: currentVideoInfo.channelId, name: currentVideoInfo.channelName }]
-        : [];
-    const seen = new Set();
-
-    return [...channels, ...primaryChannel].filter(channel => {
-        if (!channel?.id || seen.has(channel.id)) return false;
-        seen.add(channel.id);
-        return true;
-    });
-}
-
-closeFilterBtn.addEventListener('click', () => {
-    filterPanel.classList.remove('open');
-    document.documentElement.classList.remove('panel-open');
-    document.body.classList.remove('panel-open');
-});
-
-// Fetch current video info from content script with retry logic
-async function fetchCurrentVideoInfo(retryCount = 0) {
-    const currentChannelName = document.getElementById('current-channel-name');
-    const MAX_RETRIES = 3;
-    const RETRY_DELAY = 800;
-
-    try {
-        const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-        const currentTab = tabs[0];
-
-        if (!currentTab?.url?.match(/youtube\.com\/watch/)) {
-            currentChannelName.textContent = t('notOnVideo');
-            quickAddChannelBtn.disabled = true;
-            return;
-        }
-
-        // Show loading state on first attempt
-        if (retryCount === 0) {
-            currentChannelName.textContent = '...';
-        }
-
-        const response = await chrome.tabs.sendMessage(currentTab.id, { action: 'getVideoInfo' });
-
-        if (response?.channelName) {
-            currentVideoInfo = response;
-            const channels = getCurrentVideoChannels();
-            currentChannelName.textContent = channels.map(channel => channel.name).join(', ') || response.channelName;
-            quickAddChannelBtn.disabled = false;
-
-            // Check if already added
-            updateQuickAddButtonState();
-        } else {
-            // Retry if channel not found yet (YouTube might still be loading)
-            if (retryCount < MAX_RETRIES) {
-                setTimeout(() => fetchCurrentVideoInfo(retryCount + 1), RETRY_DELAY);
-            } else {
-                currentChannelName.textContent = t('channelNotFound');
-                quickAddChannelBtn.disabled = true;
-            }
-        }
-    } catch (error) {
-        // Retry on error (content script might not be ready)
-        if (retryCount < MAX_RETRIES) {
-            setTimeout(() => fetchCurrentVideoInfo(retryCount + 1), RETRY_DELAY);
-        } else {
-            currentChannelName.textContent = t('notOnVideo');
-            quickAddChannelBtn.disabled = true;
-        }
-    }
-}
-
-// Update quick add button state based on current rules
-async function updateQuickAddButtonState() {
-    const currentChannels = getCurrentVideoChannels();
-    if (currentChannels.length === 0) return;
-
-    const result = await chrome.storage.sync.get(['filterRules']);
-    const rules = result.filterRules || { whitelist: { channels: [], keywords: [] } };
-
-    const savedChannels = rules.whitelist?.channels || [];
-    const allInWhitelist = currentChannels.every(channel =>
-        savedChannels.some(savedChannel => savedChannel.id === channel.id)
-    );
-
-    quickAddChannelBtn.classList.toggle('active', allInWhitelist);
-
-    const btnSpan = quickAddChannelBtn.querySelector('span');
-    if (btnSpan) btnSpan.textContent = allInWhitelist ? t('remove') : t('add');
-}
-
-// Load and display filter rules (whitelist-only)
-async function loadFilterRules() {
-    const result = await chrome.storage.sync.get(['filterRules']);
-    const rules = result.filterRules || {
-        whitelist: { channels: [], keywords: [] }
+function renderState() {
+    const showMessage = key => {
+        els.statePill.hidden = true;
+        els.backToAuto.hidden = true;
+        els.stateText.textContent = key ? t(key) : '';
     };
 
-    // Render the whitelist
-    renderRulesList(rules);
+    if (!state.onWatch) return showMessage('noVideoSwitch');
+    if (state.contentMissing) return showMessage('reloadTab');
+    if (!state.status) return showMessage('');
+    if (!state.status.onVideo) return showMessage('noVideoSwitch');
+
+    els.statePill.hidden = false;
+    els.statePill.textContent = t(state.status.audio ? 'nowAudio' : 'nowVideo');
+    els.stateText.textContent = t(REASON_KEYS[state.status.reason] || 'reasonNone');
+    els.backToAuto.hidden = state.status.reason !== 'manual';
 }
 
-function renderRulesList(rules) {
-    const whitelist = rules.whitelist || { channels: [], keywords: [] };
-
-    // Render channels
-    const channelsList = document.getElementById('channels-list');
-    if (whitelist.channels?.length > 0) {
-        channelsList.innerHTML = whitelist.channels.map(channel => `
-            <div class="rule-item" data-id="${escapeHtml(channel.id)}" data-type="channel">
-                <span class="rule-name">${escapeHtml(channel.name)}</span>
-                <button class="remove-rule-btn" data-id="${escapeHtml(channel.id)}" data-type="channel">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <line x1="18" y1="6" x2="6" y2="18"></line>
-                        <line x1="6" y1="6" x2="18" y2="18"></line>
-                    </svg>
-                </button>
-            </div>
-        `).join('');
-    } else {
-        channelsList.innerHTML = `<div class="empty-state">${t('noChannels')}</div>`;
+function renderChannel() {
+    const channels = videoChannels(state.videoInfo);
+    if (!state.onWatch || state.contentMissing || channels.length === 0) {
+        els.channel.hidden = true;
+        return;
     }
 
-    // Render keywords
-    const keywordsList = document.getElementById('keywords-list');
-    if (whitelist.keywords?.length > 0) {
-        keywordsList.innerHTML = whitelist.keywords.map(kw => `
-            <div class="rule-item" data-keyword="${escapeHtml(kw.keyword)}" data-type="keyword">
-                <span class="rule-name">"${escapeHtml(kw.keyword)}"</span>
-                <button class="remove-rule-btn" data-keyword="${escapeHtml(kw.keyword)}" data-type="keyword">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <line x1="18" y1="6" x2="6" y2="18"></line>
-                        <line x1="6" y1="6" x2="18" y2="18"></line>
-                    </svg>
-                </button>
-            </div>
-        `).join('');
-    } else {
-        keywordsList.innerHTML = `<div class="empty-state">${t('noKeywords')}</div>`;
-    }
+    const name = channels.map(channel => channel.name).join(', ');
+    const inList = channelsInList(state.filterRules, channels);
 
-    // Add event listeners for remove buttons
-    document.querySelectorAll('.remove-rule-btn').forEach(btn => {
-        btn.addEventListener('click', () => removeRule(btn.dataset));
+    els.channel.hidden = false;
+    els.channelAvatar.textContent = Array.from(channels[0].name.trim())[0]?.toUpperCase() || '?';
+    els.channelAvatar.style.background = avatarColor(channels[0].name);
+    els.channelName.textContent = name;
+    els.channelName.title = name;
+    els.channelAdd.dataset.in = String(inList);
+    els.channelAdd.setAttribute('aria-pressed', String(inList));
+    els.channelAdd.textContent = t(inList ? 'inYourList' : 'alwaysListen');
+}
+
+function renderMode() {
+    els.modeButtons.forEach(button => {
+        button.setAttribute('aria-pressed', String(button.dataset.mode === state.mode));
+    });
+
+    if (state.mode === 'filtered') {
+        const count = state.filterRules.whitelist.channels.length;
+        els.modeHint.textContent = count === 1
+            ? t('hintMyListOne')
+            : fillTemplate(t('hintMyList'), { count });
+    } else {
+        els.modeHint.textContent = t(HINT_KEYS[state.mode]);
+    }
+}
+
+function renderLooks() {
+    els.lookButtons.forEach(button => {
+        button.setAttribute('aria-pressed', String(button.dataset.look === state.look));
     });
 }
 
-// Add a new rule to whitelist
-async function addRule(ruleType, value) {
-    if (!value) return;
-
-    const result = await chrome.storage.sync.get(['filterRules']);
-    const rules = result.filterRules || {
-        whitelist: { channels: [], keywords: [] }
-    };
-
-    // Ensure whitelist exists
-    if (!rules.whitelist) {
-        rules.whitelist = { channels: [], keywords: [] };
-    }
-
-    if (ruleType === 'channel') {
-        // For channel, value should be { id, name }
-        if (!rules.whitelist.channels.some(c => c.id === value.id)) {
-            rules.whitelist.channels.push({
-                id: value.id,
-                name: value.name,
-                addedAt: Date.now()
-            });
-        }
-    } else {
-        // For keyword
-        const keyword = typeof value === 'string' ? value.trim() : value;
-        if (keyword && !rules.whitelist.keywords.some(k => k.keyword.toLowerCase() === keyword.toLowerCase())) {
-            rules.whitelist.keywords.push({
-                keyword: keyword,
-                caseSensitive: false,
-                addedAt: Date.now()
-            });
-        }
-    }
-
-    await chrome.storage.sync.set({ filterRules: rules });
-    loadFilterRules();
-
-    // Show feedback
-    showToast(t('ruleAdded'));
+function renderStats() {
+    const amount = formatSavedAmount(savedMegabytes(sumMonthSeconds(state.statsLogs)), t);
+    const [before, after = ''] = t('savedThisMonth').split('{amount}');
+    const num = document.createElement('span');
+    num.className = 'num';
+    num.textContent = amount;
+    els.statsText.replaceChildren(before, num, after);
 }
 
-// Remove a rule from whitelist
-async function removeRule(dataset) {
-    const result = await chrome.storage.sync.get(['filterRules']);
-    const rules = result.filterRules;
-    if (!rules || !rules.whitelist) return;
-
-    if (dataset.type === 'channel') {
-        rules.whitelist.channels = rules.whitelist.channels.filter(c => c.id !== dataset.id);
-    } else {
-        rules.whitelist.keywords = rules.whitelist.keywords.filter(k => k.keyword !== dataset.keyword);
-    }
-
-    await chrome.storage.sync.set({ filterRules: rules });
-    loadFilterRules();
-    updateQuickAddButtonState();
-
-    showToast(t('ruleRemoved'));
+function render() {
+    renderSwitch();
+    renderState();
+    renderChannel();
+    renderMode();
+    renderLooks();
+    renderStats();
 }
 
-// Helper: Escape HTML
-function escapeHtml(text) {
-    if (!text) return '';
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
+// ---------- toast ----------
 
-// Helper: Show toast notification
+/**
+ * @param {string} message
+ */
 function showToast(message) {
-    // Create toast element if not exists - append to body for fixed positioning
-    let toast = document.querySelector('.toast');
-    if (!toast) {
-        toast = document.createElement('div');
-        toast.className = 'toast';
-        document.body.appendChild(toast);
-    }
-    toast.textContent = message;
-    toast.classList.add('show');
-    setTimeout(() => toast.classList.remove('show'), 2000);
+    els.toast.textContent = message;
+    els.toast.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { els.toast.hidden = true; }, TOAST_MS);
 }
 
-// Add rule button (handles keywords only)
-addRuleBtn.addEventListener('click', () => {
-    const value = newRuleInput.value.trim();
-    if (!value) return;
+// ---------- actions ----------
 
-    addRule('keyword', value);
-    newRuleInput.value = '';
+/**
+ * @param {boolean} audio
+ */
+async function setVideoAudio(audio) {
+    if (!state.status?.onVideo) return;
+    state.status = { ...state.status, audio, reason: 'manual', override: audio };
+    render();
+    await sendToTab({ action: 'setVideoAudio', audio });
+    scheduleStatusRefresh(SWITCH_REFRESH_MS);
+}
+
+async function backToAuto() {
+    await sendToTab({ action: 'clearOverride' });
+    scheduleStatusRefresh(SWITCH_REFRESH_MS);
+}
+
+async function toggleCurrentChannels() {
+    const channels = videoChannels(state.videoInfo);
+    if (channels.length === 0) return;
+
+    const { filterRules } = await chrome.storage.sync.get(['filterRules']);
+    const wasInList = channelsInList(filterRules, channels);
+    const nextRules = toggleChannels(filterRules, channels, Date.now());
+
+    state.filterRules = nextRules;
+    render();
+    await chrome.storage.sync.set({ filterRules: nextRules });
+    showToast(t(wasInList ? 'removedFromList' : 'addedToList'));
+    scheduleStatusRefresh(RULES_REFRESH_MS);
+}
+
+/**
+ * @param {string} mode 'always' | 'filtered' | 'off'
+ */
+async function selectMode(mode) {
+    if (!VALID_MODE_TYPES.has(mode) || mode === state.mode) return;
+    state.mode = mode;
+    render();
+    await chrome.storage.sync.set({ audioModeType: mode });
+    await sendToTab({ action: 'modeChanged', mode });
+    scheduleStatusRefresh(RULES_REFRESH_MS);
+}
+
+/**
+ * @param {string} look
+ */
+async function selectLook(look) {
+    if (!PLAYER_LOOKS.includes(look) || look === state.look) return;
+    state.look = look;
+    render();
+    await chrome.storage.sync.set({ playerLook: look });
+    await sendToTab({ action: 'playerLookChanged', look });
+}
+
+async function toggleLanguage() {
+    const lang = getLanguage() === 'ar' ? 'en' : 'ar';
+    await chrome.storage.sync.set({ language: lang });
+    await applyLanguage(lang);
+    render();
+    await sendToTab({ action: 'updateLanguage', language: lang });
+}
+
+function openStats() {
+    chrome.storage.session?.set({ optionsSection: 'stats' }).catch(() => { });
+    chrome.runtime.openOptionsPage();
+}
+
+// ---------- wiring ----------
+
+els.switchButtons.forEach(button => {
+    button.addEventListener('click', () => setVideoAudio(button.dataset.audio === 'true'));
 });
+els.backToAuto.addEventListener('click', backToAuto);
+els.channelAdd.addEventListener('click', toggleCurrentChannels);
+els.modeButtons.forEach(button => {
+    button.addEventListener('click', () => selectMode(button.dataset.mode));
+});
+els.lookButtons.forEach(button => {
+    button.addEventListener('click', () => selectLook(button.dataset.look));
+});
+els.langBtn.addEventListener('click', toggleLanguage);
+els.gearBtn.addEventListener('click', () => chrome.runtime.openOptionsPage());
+els.stats.addEventListener('click', openStats);
 
-// Enter key to add rule
-newRuleInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') {
-        addRuleBtn.click();
+chrome.storage.onChanged.addListener((changes, namespace) => {
+    if (namespace === 'sync') {
+        let rerender = false;
+        if (changes.audioModeType) {
+            const mode = changes.audioModeType.newValue;
+            state.mode = VALID_MODE_TYPES.has(mode) ? mode : 'always';
+            rerender = true;
+        }
+        if (changes.playerLook) {
+            const look = changes.playerLook.newValue;
+            state.look = PLAYER_LOOKS.includes(look) ? look : 'card';
+            rerender = true;
+        }
+        if (changes.filterRules) {
+            state.filterRules = sanitizeFilterRules(changes.filterRules.newValue);
+            rerender = true;
+        }
+        if (rerender) render();
+        if (changes.audioModeType || changes.filterRules) scheduleStatusRefresh(RULES_REFRESH_MS);
+    } else if (namespace === 'local' && changes.statsLogs) {
+        state.statsLogs = changes.statsLogs.newValue || {};
+        renderStats();
     }
 });
 
-// Quick add channel button (toggle whitelist)
-quickAddChannelBtn.addEventListener('click', async () => {
-    const currentChannels = getCurrentVideoChannels();
-    if (currentChannels.length === 0) return;
+async function init() {
+    const sync = await chrome.storage.sync.get(['language', 'audioModeType', 'playerLook', 'filterRules']);
+    const local = await chrome.storage.local.get(['statsLogs']);
 
-    const result = await chrome.storage.sync.get(['filterRules']);
-    const rules = result.filterRules || { whitelist: { channels: [], keywords: [] } };
+    const uiLang = chrome.i18n.getUILanguage().startsWith('ar') ? 'ar' : 'en';
+    state.mode = VALID_MODE_TYPES.has(sync.audioModeType) ? sync.audioModeType : 'always';
+    state.look = PLAYER_LOOKS.includes(sync.playerLook) ? sync.playerLook : 'card';
+    state.filterRules = sanitizeFilterRules(sync.filterRules);
+    state.statsLogs = local.statsLogs || {};
 
-    // Ensure whitelist exists
-    if (!rules.whitelist) {
-        rules.whitelist = { channels: [], keywords: [] };
-    }
+    await applyLanguage(VALID_LANGUAGES.has(sync.language) ? sync.language : uiLang);
 
-    const allChannelsExist = currentChannels.every(channel =>
-        rules.whitelist.channels.some(savedChannel => savedChannel.id === channel.id)
-    );
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    state.tab = tab || null;
+    state.onWatch = /^https:\/\/(www\.)?youtube\.com\/watch/.test(tab?.url || '');
+    render();
 
-    if (allChannelsExist) {
-        // Remove from whitelist
-        const currentChannelIds = new Set(currentChannels.map(channel => channel.id));
-        rules.whitelist.channels = rules.whitelist.channels.filter(channel => !currentChannelIds.has(channel.id));
-        showToast(t('ruleRemoved'));
-    } else {
-        // Add missing channels to whitelist
-        currentChannels.forEach(channel => {
-            if (!rules.whitelist.channels.some(savedChannel => savedChannel.id === channel.id)) {
-                rules.whitelist.channels.push({
-                    id: channel.id,
-                    name: channel.name,
-                    addedAt: Date.now()
-                });
-            }
-        });
-        showToast(t('ruleAdded'));
-    }
+    if (!state.onWatch) return;
 
-    await chrome.storage.sync.set({ filterRules: rules });
-    loadFilterRules();
-    updateQuickAddButtonState();
-});
+    const [status, videoInfo] = await Promise.all([
+        sendWithRetry({ action: 'getStatus' }, response => !!response),
+        sendWithRetry({ action: 'getVideoInfo' }, response => !!response?.channelName)
+    ]);
+
+    state.status = status || null;
+    state.contentMissing = !status;
+    state.videoInfo = videoInfo?.channelName ? videoInfo : null;
+    render();
+}
+
+init();

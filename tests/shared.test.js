@@ -86,3 +86,124 @@ test('export filename follows earmode-settings-YYYY-MM-DD.json', () => {
     assert.match(api.exportFileName(), /^earmode-settings-\d{4}-\d{2}-\d{2}\.json$/);
     assert.equal(api.exportFileName(new Date('2026-09-28T12:00:00Z')), 'earmode-settings-2026-09-28.json');
 });
+
+test('sanitizeFilterRules dedupes channels by id and keywords case-insensitively after trimming', () => {
+    const api = loadShared();
+    const rules = plain(api.sanitizeFilterRules({
+        whitelist: {
+            channels: [
+                { id: ' UC1 ', name: ' One ', addedAt: 5 },
+                { id: 'UC1', name: 'Dup', addedAt: 6 },
+                { id: 'UC2', name: '', addedAt: 7 },
+                { id: '', name: 'No id' },
+                null,
+                'junk'
+            ],
+            keywords: [
+                { keyword: '  Podcast ', addedAt: 1 },
+                { keyword: 'podcast', addedAt: 2 },
+                { keyword: 'PODCAST  ', addedAt: 3 },
+                { keyword: '   ' },
+                { keyword: 'Talk', caseSensitive: true, addedAt: 4 }
+            ]
+        }
+    }));
+    assert.deepEqual(rules.whitelist.channels, [
+        { id: 'UC1', name: 'One', addedAt: 5 },
+        { id: 'UC2', name: 'UC2', addedAt: 7 }
+    ]);
+    assert.deepEqual(rules.whitelist.keywords, [
+        { keyword: 'Podcast', caseSensitive: false, addedAt: 1 },
+        { keyword: 'Talk', caseSensitive: true, addedAt: 4 }
+    ]);
+});
+
+test('sanitizeFilterRules returns empty lists for bad input', () => {
+    const api = loadShared();
+    assert.deepEqual(plain(api.sanitizeFilterRules(null)), { whitelist: { channels: [], keywords: [] } });
+    assert.deepEqual(plain(api.sanitizeFilterRules({ whitelist: 'x' })), { whitelist: { channels: [], keywords: [] } });
+});
+
+test('sumMonthSeconds adds only the current month', () => {
+    const api = loadShared();
+    const logs = { '2026-09-01': 60, '2026-09-28': 120, '2026-08-31': 999, '2025-09-10': 50, '2026-09-15': 'x' };
+    assert.equal(api.sumMonthSeconds(logs, new Date('2026-09-28T12:00:00Z')), 180);
+    assert.equal(api.sumMonthSeconds(null, new Date('2026-09-28T12:00:00Z')), 0);
+});
+
+test('savedMegabytes uses 720p minus 144p rate', () => {
+    const api = loadShared();
+    assert.equal(api.savedMegabytes(0), 0);
+    assert.equal(api.savedMegabytes(600), 180); // 10 minutes * 18 MB
+});
+
+test('formatSavedAmount shows MB below 1024 and GB with one decimal above', () => {
+    const api = loadShared();
+    const t = key => ({ unitGB: ' GB', unitMB: ' MB' }[key]);
+    assert.equal(api.formatSavedAmount(0, t), '0 MB');
+    assert.equal(api.formatSavedAmount(512.6, t), '513 MB');
+    assert.equal(api.formatSavedAmount(1023.4, t), '1023 MB');
+    assert.equal(api.formatSavedAmount(1024, t), '1.0 GB');
+    assert.equal(api.formatSavedAmount(2355, t), '2.3 GB');
+});
+
+test('videoChannels dedupes the channel list and falls back to the primary channel', () => {
+    const api = loadShared();
+    assert.deepEqual(plain(api.videoChannels({
+        channelId: 'UC1', channelName: 'One',
+        channels: [{ id: 'UC1', name: 'One' }, { id: 'UC2', name: 'Two' }, { id: 'UC1', name: 'One again' }, { name: 'no id' }]
+    })), [{ id: 'UC1', name: 'One' }, { id: 'UC2', name: 'Two' }]);
+    assert.deepEqual(plain(api.videoChannels({ channelId: 'UC9', channelName: 'Nine', channels: [] })), [{ id: 'UC9', name: 'Nine' }]);
+    assert.deepEqual(plain(api.videoChannels(null)), []);
+});
+
+test('channelsInList is true only when every channel is saved', () => {
+    const api = loadShared();
+    const rules = { whitelist: { channels: [{ id: 'UC1', name: 'One', addedAt: 1 }], keywords: [] } };
+    assert.equal(api.channelsInList(rules, [{ id: 'UC1', name: 'One' }]), true);
+    assert.equal(api.channelsInList(rules, [{ id: 'UC1', name: 'One' }, { id: 'UC2', name: 'Two' }]), false);
+    assert.equal(api.channelsInList(rules, []), false);
+    assert.equal(api.channelsInList(undefined, [{ id: 'UC1', name: 'One' }]), false);
+});
+
+test('toggleChannels adds missing channels when not all are in the list', () => {
+    const api = loadShared();
+    const rules = {
+        whitelist: {
+            channels: [{ id: 'UC1', name: 'One', addedAt: 1 }],
+            keywords: [{ keyword: 'news', caseSensitive: false, addedAt: 2 }]
+        }
+    };
+    const next = plain(api.toggleChannels(rules, [{ id: 'UC1', name: 'One' }, { id: 'UC2', name: 'Two' }], 500));
+    assert.deepEqual(next.whitelist.channels, [
+        { id: 'UC1', name: 'One', addedAt: 1 },
+        { id: 'UC2', name: 'Two', addedAt: 500 }
+    ]);
+    assert.deepEqual(next.whitelist.keywords, rules.whitelist.keywords);
+    assert.equal(rules.whitelist.channels.length, 1, 'input not mutated');
+});
+
+test('toggleChannels removes all channels when all are in the list', () => {
+    const api = loadShared();
+    const rules = {
+        whitelist: {
+            channels: [{ id: 'UC1', name: 'One', addedAt: 1 }, { id: 'UC2', name: 'Two', addedAt: 2 }, { id: 'UC3', name: 'Three', addedAt: 3 }],
+            keywords: []
+        }
+    };
+    const next = plain(api.toggleChannels(rules, [{ id: 'UC1', name: 'One' }, { id: 'UC2', name: 'Two' }], 500));
+    assert.deepEqual(next.whitelist.channels, [{ id: 'UC3', name: 'Three', addedAt: 3 }]);
+});
+
+test('toggleChannels works from empty rules', () => {
+    const api = loadShared();
+    const next = plain(api.toggleChannels(undefined, [{ id: 'UC1', name: 'One' }], 42));
+    assert.deepEqual(next, { whitelist: { channels: [{ id: 'UC1', name: 'One', addedAt: 42 }], keywords: [] } });
+});
+
+test('fillTemplate replaces named placeholders', () => {
+    const api = loadShared();
+    assert.equal(api.fillTemplate('{count} channels in your list.', { count: 3 }), '3 channels in your list.');
+    assert.equal(api.fillTemplate('Saved {amount} this month', { amount: '2.3 GB' }), 'Saved 2.3 GB this month');
+    assert.equal(api.fillTemplate('No {missing}', {}), 'No {missing}');
+});

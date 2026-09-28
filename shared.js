@@ -122,6 +122,110 @@
         };
     }
 
+
+    // Data rates in MB per minute, used to estimate data saved by listening at 144p
+    const RATE_720P_MB_PER_MIN = 18.75;
+    const RATE_144P_MB_PER_MIN = 0.75;
+
+    /**
+     * Sum the listened seconds logged in the month of `now`.
+     * Log keys are UTC dates (YYYY-MM-DD), matching the content script.
+     * @param {Object<string, number>} statsLogs
+     * @param {Date} [now]
+     * @returns {number}
+     */
+    function sumMonthSeconds(statsLogs, now = new Date()) {
+        if (!statsLogs || typeof statsLogs !== 'object') return 0;
+        const prefix = now.toISOString().slice(0, 7);
+        return Object.entries(statsLogs).reduce((total, [date, seconds]) => (
+            date.startsWith(prefix) && Number.isFinite(seconds) ? total + seconds : total
+        ), 0);
+    }
+
+    /**
+     * Estimate megabytes saved by listening instead of watching at 720p.
+     * @param {number} seconds Listened seconds
+     * @returns {number}
+     */
+    function savedMegabytes(seconds) {
+        return (seconds / 60) * (RATE_720P_MB_PER_MIN - RATE_144P_MB_PER_MIN);
+    }
+
+    /**
+     * Format a saved amount: GB with one decimal from 1024 MB, whole MB below.
+     * @param {number} mb
+     * @param {function(string): string} translate Message lookup for unitGB/unitMB
+     * @returns {string}
+     */
+    function formatSavedAmount(mb, translate) {
+        if (mb >= 1024) return `${(mb / 1024).toFixed(1)}${translate('unitGB')}`;
+        return `${Math.round(mb)}${translate('unitMB')}`;
+    }
+
+    /**
+     * Replace {name} placeholders in a message.
+     * @param {string} message
+     * @param {Object<string, string|number>} values
+     * @returns {string}
+     */
+    function fillTemplate(message, values) {
+        return String(message).replace(/\{(\w+)\}/g, (match, name) => (
+            Object.prototype.hasOwnProperty.call(values, name) ? String(values[name]) : match
+        ));
+    }
+
+    /**
+     * All channels of a video (collaborations included), deduped by id.
+     * Falls back to the primary channelId/channelName.
+     * @param {{channelId?: string, channelName?: string, channels?: Array<{id: string, name: string}>}|null} videoInfo
+     * @returns {Array<{id: string, name: string}>}
+     */
+    function videoChannels(videoInfo) {
+        if (!videoInfo) return [];
+        const listed = Array.isArray(videoInfo.channels) ? videoInfo.channels : [];
+        const primary = videoInfo.channelId ? [{ id: videoInfo.channelId, name: videoInfo.channelName }] : [];
+        const seen = new Set();
+        return [...listed, ...primary].reduce((items, channel) => {
+            if (!channel?.id || seen.has(channel.id)) return items;
+            seen.add(channel.id);
+            items.push({ id: channel.id, name: channel.name || channel.id });
+            return items;
+        }, []);
+    }
+
+    /**
+     * @param {*} filterRules
+     * @param {Array<{id: string}>} channels
+     * @returns {boolean} True when there is at least one channel and all are saved.
+     */
+    function channelsInList(filterRules, channels) {
+        if (!channels.length) return false;
+        const saved = new Set(sanitizeFilterRules(filterRules).whitelist.channels.map(channel => channel.id));
+        return channels.every(channel => saved.has(channel.id));
+    }
+
+    /**
+     * Remove the channels when all are saved, otherwise add the missing ones.
+     * Does not mutate the input.
+     * @param {*} filterRules
+     * @param {Array<{id: string, name: string}>} channels
+     * @param {number} [now] Timestamp for addedAt
+     * @returns {{whitelist: {channels: Array, keywords: Array}}}
+     */
+    function toggleChannels(filterRules, channels, now = Date.now()) {
+        const rules = sanitizeFilterRules(filterRules);
+        const ids = new Set(channels.map(channel => channel.id));
+
+        if (channelsInList(rules, channels)) {
+            rules.whitelist.channels = rules.whitelist.channels.filter(channel => !ids.has(channel.id));
+        } else {
+            channels.forEach(channel => {
+                rules.whitelist.channels.push({ id: channel.id, name: channel.name, addedAt: now });
+            });
+        }
+        return sanitizeFilterRules(rules);
+    }
+
     /**
      * Validate a parsed settings file and return only the supported, valid settings.
      * Accepts files exported by Earmode, by the older YouTube Audio Mode, or with no app id.
@@ -217,6 +321,13 @@
         sanitizeFilterRules,
         validateImportedSettings,
         buildExportPayload,
-        exportFileName
+        exportFileName,
+        sumMonthSeconds,
+        savedMegabytes,
+        formatSavedAmount,
+        fillTemplate,
+        videoChannels,
+        channelsInList,
+        toggleChannels
     };
 })();

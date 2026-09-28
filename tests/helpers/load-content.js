@@ -144,7 +144,44 @@ globalThis.__audioModeTestApi = {
     decideAudio,
     getEarmodeStatus,
     setVideoAudio,
-    clearOverride
+    clearOverride,
+    applyModeLogic,
+    applyDecision,
+    applyFilteredMode,
+    enableAudioMode(fromAutoRule) {
+        return enableAudioMode(fromAutoRule);
+    },
+    setRuntimeIdForTest(id) {
+        chrome.runtime.id = id;
+    },
+    setModeForTest(mode) {
+        currentModeType = mode;
+    },
+    replaceEnableAudioModeForTest(fn) {
+        enableAudioMode = fn;
+    },
+    // Replace the DOM-heavy audio paths with recorders. Tests using this check
+    // which path the decision logic takes, not what those paths do to the page.
+    stubAudioPathsForTest() {
+        const calls = [];
+        enableAudioMode = fromAutoRule => {
+            calls.push({ name: 'enable', fromAutoRule });
+            audioModeEnabled = true;
+            emitEarmodeState();
+        };
+        disableAudioMode = fromAutoRule => {
+            calls.push({ name: 'disable', fromAutoRule });
+            audioModeEnabled = false;
+            emitEarmodeState();
+        };
+        setLowestQuality = () => {
+            calls.push({ name: 'lowest' });
+        };
+        applyPreferredQuality = () => {
+            calls.push({ name: 'preferred' });
+        };
+        return calls;
+    }
 };`, context);
 
     return context.__audioModeTestApi;

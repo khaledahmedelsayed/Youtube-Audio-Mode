@@ -48,3 +48,95 @@ test('getEarmodeStatus reports page, audio, reason and mode', () => {
     assert.equal(typeof status.mode, 'string');
     assert.equal(status.override, null);
 });
+
+// Drain timers and the promise continuations they unblock.
+async function settle(timers, rounds = 20) {
+    for (let i = 0; i < rounds; i++) {
+        timers.runAll();
+        await new Promise(resolve => setImmediate(resolve));
+    }
+}
+
+test('manual switch turns audio on in off mode', async () => {
+    const timers = createTimers();
+    const api = loadContentScript(timers);
+    api.stubAudioPathsForTest();
+    api.setModeForTest('off');
+
+    api.setVideoAudio(true);
+    await settle(timers);
+
+    const status = plain(api.getEarmodeStatus());
+    assert.equal(status.audio, true);
+    assert.equal(status.reason, 'manual');
+});
+
+test('manual switch turns audio off in always mode, clearOverride returns to auto', async () => {
+    const timers = createTimers();
+    const api = loadContentScript(timers);
+    api.stubAudioPathsForTest();
+    api.setModeForTest('always');
+
+    api.setVideoAudio(false);
+    await settle(timers);
+    let status = plain(api.getEarmodeStatus());
+    assert.equal(status.audio, false);
+    assert.equal(status.reason, 'manual');
+
+    api.clearOverride();
+    await settle(timers);
+    status = plain(api.getEarmodeStatus());
+    assert.equal(status.audio, true);
+    assert.equal(status.reason, 'all');
+});
+
+test('applyDecision re-applies lowest quality when audio is already on', () => {
+    const api = loadContentScript(createTimers());
+    const calls = api.stubAudioPathsForTest();
+    api.setAudioModeEnabled(true);
+
+    api.applyDecision({ audio: true });
+
+    assert.deepEqual(Array.from(calls, call => call.name), ['lowest']);
+});
+
+test('setVideoAudio is ignored off a video page', () => {
+    const api = loadContentScript(createTimers());
+    api.setSearchForTest('');
+
+    api.setVideoAudio(true);
+
+    assert.equal(api.getEarmodeStatus().override, null);
+});
+
+test('filtered mode without video info falls back to preferred quality', async () => {
+    const timers = createTimers();
+    const api = loadContentScript(timers);
+    const calls = api.stubAudioPathsForTest();
+    // applyFilteredMode bails out when the extension context is gone.
+    api.setRuntimeIdForTest('test-extension');
+    api.setModeForTest('filtered');
+
+    api.applyFilteredMode();
+    await settle(timers, 40);
+
+    assert.equal(api.getEarmodeStatus().reason, 'notInList');
+    assert.deepEqual(Array.from(calls, call => call.name), ['preferred']);
+});
+
+test('enableAudioMode retry keeps the fromAutoRule flag', () => {
+    const timers = createTimers();
+    const api = loadContentScript(timers);
+    api.setDocumentForTest({
+        querySelector: () => null,
+        querySelectorAll: () => [],
+        getElementById: () => null
+    });
+
+    api.enableAudioMode(true);
+    const retries = [];
+    api.replaceEnableAudioModeForTest((...args) => retries.push(args));
+    timers.runAll();
+
+    assert.deepEqual(plain(retries), [[true]]);
+});

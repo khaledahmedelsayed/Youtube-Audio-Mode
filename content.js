@@ -195,7 +195,8 @@ function getCurrentVideoId() {
  * @returns {boolean|null}
  */
 function getActiveOverride() {
-    if (manualOverride && manualOverride.videoId === getCurrentVideoId()) {
+    const videoId = getCurrentVideoId();
+    if (manualOverride && videoId && manualOverride.videoId === videoId) {
         return manualOverride.audio;
     }
     manualOverride = null;
@@ -252,6 +253,7 @@ function getEarmodeStatus() {
  * @param {boolean} audio
  */
 function setVideoAudio(audio) {
+    if (!isOnVideoPage()) return;
     manualOverride = { videoId: getCurrentVideoId(), audio: !!audio };
     emitEarmodeState();
     scheduleModeLogic('manual switch', 0);
@@ -424,11 +426,9 @@ async function applyFilteredMode(retryCount = 0, generation = modeApplyGeneratio
             }
 
             // Max retries reached - disable audio mode
+            console.log('[Audio Mode] No video info after retries - treating as not in list');
             lastDecision = { audio: false, reason: 'notInList' };
-            if (audioModeEnabled) {
-                console.log('[Audio Mode] No video info after retries - disabling');
-                disableAudioMode(true);
-            }
+            applyDecision(lastDecision);
             return;
         }
 
@@ -831,7 +831,7 @@ async function enableAudioMode(fromAutoRule = false) {
     // Find the video player
     const video = getVideoElement();
     if (!video) {
-        setTimeout(enableAudioMode, TIMING.RETRY_DELAY);
+        setTimeout(() => enableAudioMode(fromAutoRule), TIMING.RETRY_DELAY);
         return;
     }
 

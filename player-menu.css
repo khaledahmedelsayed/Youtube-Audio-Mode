@@ -31,7 +31,8 @@
 .em-player-btn {
     position: absolute;
     top: 12px;
-    inset-inline-start: 12px;
+    left: 12px;
+    right: auto;
     z-index: 65;
     display: flex;
     align-items: center;
@@ -39,7 +40,8 @@
     margin: 0;
     border: 0;
     border-radius: 999px;
-    padding: 6px 10px 6px 8px;
+    padding-block: 6px;
+    padding-inline: 8px 10px;
     background: rgba(15, 15, 20, .72);
     color: #fff;
     font-size: 12px;
@@ -79,7 +81,8 @@
 .em-player-menu {
     position: absolute;
     top: 50px;
-    inset-inline-start: 12px;
+    left: 12px;
+    right: auto;
     z-index: 65;
     width: 268px;
     max-width: calc(100% - 24px);
@@ -96,6 +99,25 @@
     line-height: normal;
     text-align: start;
     cursor: default;
+}
+
+/* Arabic: anchor to the right edge */
+.em-player-btn[dir="rtl"],
+.em-player-menu[dir="rtl"] {
+    left: auto;
+    right: 12px;
+}
+
+/* Fullscreen and embeds show the video title at the top; sit below it */
+#movie_player.ytp-fullscreen > .em-player-btn,
+#movie_player.ytp-embed > .em-player-btn {
+    top: 64px;
+}
+
+#movie_player.ytp-fullscreen > .em-player-menu,
+#movie_player.ytp-embed > .em-player-menu {
+    top: 102px;
+    max-height: calc(100% - 114px);
 }
 
 .em-player-menu[hidden] {

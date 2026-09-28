@@ -69,8 +69,12 @@ function loadContentScript(timers, { extraScripts = [] } = {}) {
         // window.location and location share one object so tests can change the URL.
         window: {
             location,
-            addEventListener() {},
-            dispatchEvent() {
+            listeners: {},
+            addEventListener(type, fn) {
+                (this.listeners[type] ||= []).push(fn);
+            },
+            dispatchEvent(event) {
+                (this.listeners[event.type] || []).forEach(fn => fn(event));
                 return true;
             }
         },
@@ -115,7 +119,10 @@ function loadContentScript(timers, { extraScripts = [] } = {}) {
                     set() {}
                 },
                 onChanged: {
-                    addListener() {}
+                    listeners: [],
+                    addListener(fn) {
+                        this.listeners.push(fn);
+                    }
                 }
             },
             i18n: {

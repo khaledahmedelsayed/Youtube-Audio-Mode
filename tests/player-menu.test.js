@@ -10,21 +10,26 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
 
 /**
  * Load content.js + player-menu.js with a fake #movie_player.
+ * `dom.player` / `dom.container` can be swapped to simulate YouTube building the player late.
+ * Timers set after setup are captured in `timers` instead of running.
  */
-function setupMenu({ search = '?v=dQw4w9WgXcQ' } = {}) {
+function setupMenu({ search = '?v=dQw4w9WgXcQ', withPlayer = true } = {}) {
     const api = loadContentScript(createTimers(), { extraScripts: ['player-menu.js'] });
     const ctx = api.context;
     const player = new FakeElement('div');
     player.id = 'movie_player';
+    const dom = { player: withPlayer ? player : null, container: null };
     const docListeners = {};
-    api.setDocumentForTest({
+    const doc = {
         title: 'Song - YouTube',
         body: {},
+        activeElement: null,
         contains: () => true,
         createElement: tag => new FakeElement(tag),
         createElementNS: (ns, tag) => new FakeElement(tag, ns),
         querySelector(selector) {
-            if (selector === '#movie_player') return player;
+            if (selector === '#movie_player') return dom.player;
+            if (selector === '#player-container') return dom.container;
             return null;
         },
         querySelectorAll: () => [],
@@ -35,15 +40,35 @@ function setupMenu({ search = '?v=dQw4w9WgXcQ' } = {}) {
             docListeners[type] = (docListeners[type] || []).filter(entry => entry.fn !== fn);
         },
         dispatchEvent() {}
-    });
+    };
+    api.setDocumentForTest(doc);
     api.setSearchForTest(search);
     const writes = [];
     ctx.chrome.storage.sync.set = items => {
         writes.push(plain(items));
         return Promise.resolve();
     };
+    // Capture timers set from here on; content.js timers queued at load never run
+    const timers = [];
+    ctx.setTimeout = (fn, ms) => {
+        timers.push({ fn, ms });
+        return timers.length;
+    };
+    ctx.clearTimeout = id => {
+        if (timers[id - 1]) timers[id - 1].fn = null;
+    };
+    // Run the timers pending now (not ones they add); returns how many ran
+    const runTimers = () => {
+        const pending = timers.filter(timer => timer.fn);
+        pending.forEach(timer => {
+            const fn = timer.fn;
+            timer.fn = null;
+            fn();
+        });
+        return pending.length;
+    };
     const run = code => vm.runInContext(code, ctx);
-    return { api, ctx, player, docListeners, writes, run };
+    return { api, ctx, player, dom, doc, docListeners, writes, run, timers, runTimers };
 }
 
 const buttonOf = player => player.querySelector('.em-player-btn');
@@ -217,5 +242,141 @@ test('direction follows the language and the menu leaves non-video pages', () =>
 
     api.setSearchForTest('');
     assert.equal(ctx.ensurePlayerMenu(), false);
+    assert.equal(player.children.length, 0);
+});
+
+test('Escape from outside the menu closes it without moving focus', () => {
+    const { ctx, player, doc, docListeners } = setupMenu();
+    ctx.ensurePlayerMenu();
+    buttonOf(player).dispatch('click');
+    FakeElement.focused = null;
+    doc.activeElement = new FakeElement('input');
+    docListeners.keydown.forEach(entry => entry.fn({ key: 'Escape' }));
+    assert.equal(menuOf(player).hidden, true);
+    assert.equal(FakeElement.focused, null);
+
+    buttonOf(player).dispatch('click');
+    doc.activeElement = menuOf(player).querySelector('.em-pm-mode');
+    docListeners.keydown.forEach(entry => entry.fn({ key: 'Escape' }));
+    assert.equal(FakeElement.focused, buttonOf(player));
+});
+
+/**
+ * A click event object as the document capture listener sees it
+ */
+function clickEvent(target) {
+    return {
+        target,
+        stopped: false,
+        defaultPrevented: false,
+        stopPropagation() {
+            this.stopped = true;
+        },
+        preventDefault() {
+            this.defaultPrevented = true;
+        }
+    };
+}
+
+test('dismissing click inside the player does not reach YouTube', () => {
+    const { ctx, player, docListeners } = setupMenu();
+    ctx.ensurePlayerMenu();
+    const video = player.appendChild(new FakeElement('video'));
+    buttonOf(player).dispatch('click');
+
+    const inside = clickEvent(video);
+    docListeners.click.forEach(entry => entry.fn(inside));
+    assert.equal(menuOf(player).hidden, true);
+    assert.equal(inside.stopped, true);
+    assert.equal(inside.defaultPrevented, true);
+
+    buttonOf(player).dispatch('click');
+    const outside = clickEvent(new FakeElement('div'));
+    docListeners.click.forEach(entry => entry.fn(outside));
+    assert.equal(menuOf(player).hidden, true);
+    assert.equal(outside.stopped, false);
+    assert.equal(outside.defaultPrevented, false);
+});
+
+test('touch and pointerup events do not reach the player', () => {
+    const { ctx, player } = setupMenu();
+    ctx.ensurePlayerMenu();
+    const reached = [];
+    ['pointerup', 'touchstart', 'touchend'].forEach(type => {
+        player.addEventListener(type, () => reached.push(type));
+        buttonOf(player).dispatch(type);
+        menuOf(player).querySelector('.em-pm-look').dispatch(type);
+    });
+    assert.deepEqual(reached, []);
+});
+
+test('schedulePlayerMenu retries until the player appears', () => {
+    const { ctx, player, dom, timers, runTimers } = setupMenu({ withPlayer: false });
+    ctx.schedulePlayerMenu();
+    assert.equal(timers.filter(timer => timer.fn).length, 1);
+    runTimers();
+    runTimers();
+    dom.player = player;
+    runTimers();
+    assert.equal(player.querySelectorAll('.em-player-btn').length, 1);
+    assert.equal(runTimers(), 0);
+});
+
+test('schedulePlayerMenu stops after the retry limit', () => {
+    const { ctx, timers, runTimers, run } = setupMenu({ withPlayer: false });
+    const max = run('PLAYER_MENU_MAX_RETRIES');
+    ctx.schedulePlayerMenu();
+    let rounds = 0;
+    while (runTimers() > 0) rounds++;
+    assert.equal(rounds, max);
+    assert.equal(timers.length, max);
+});
+
+test('schedulePlayerMenu stops retrying off video pages', () => {
+    const { api, ctx, timers, runTimers } = setupMenu({ withPlayer: false });
+    ctx.schedulePlayerMenu();
+    assert.equal(timers.length, 1);
+    api.setSearchForTest('');
+    runTimers();
+    assert.equal(timers.length, 1);
+});
+
+test('fallback container mount keeps looking for #movie_player', () => {
+    const { ctx, player, dom, runTimers } = setupMenu({ withPlayer: false });
+    const container = new FakeElement('div');
+    dom.container = container;
+    ctx.schedulePlayerMenu();
+    assert.equal(container.querySelectorAll('.em-player-btn').length, 1);
+
+    dom.player = player;
+    runTimers();
+    assert.equal(container.querySelectorAll('.em-player-btn').length, 0);
+    assert.equal(player.querySelectorAll('.em-player-btn').length, 1);
+    assert.equal(player.querySelectorAll('.em-player-menu').length, 1);
+    assert.equal(runTimers(), 0);
+});
+
+test('earmode:state and storage changes re-render the menu', () => {
+    const { ctx, player, run } = setupMenu();
+    ctx.ensurePlayerMenu();
+    run('audioModeEnabled = true; emitEarmodeState()');
+    assert.equal(buttonOf(player).dataset.on, 'true');
+
+    run("currentModeType = 'off'");
+    ctx.chrome.storage.onChanged.listeners.forEach(fn => fn({ audioModeType: { newValue: 'off' } }, 'sync'));
+    const pressed = menuOf(player).querySelectorAll('.em-pm-mode').map(el => el.getAttribute('aria-pressed'));
+    assert.deepEqual(plain(pressed), ['false', 'false', 'true']);
+});
+
+test('removePlayerMenu while open drops the document listeners', () => {
+    const { ctx, player, docListeners } = setupMenu();
+    ctx.ensurePlayerMenu();
+    buttonOf(player).dispatch('click');
+    assert.equal(docListeners.click.length, 1);
+    assert.equal(docListeners.keydown.length, 1);
+
+    ctx.removePlayerMenu();
+    assert.equal(docListeners.click.length, 0);
+    assert.equal(docListeners.keydown.length, 0);
     assert.equal(player.children.length, 0);
 });

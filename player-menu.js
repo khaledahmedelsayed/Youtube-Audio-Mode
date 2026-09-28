@@ -22,7 +22,8 @@ const PLAYER_MENU_LOOKS = [
 
 // Events that must not reach YouTube's player (pause, seek, fullscreen, keyboard shortcuts)
 const PLAYER_MENU_BLOCKED_EVENTS = [
-    'click', 'mousedown', 'mouseup', 'keydown', 'keyup', 'dblclick', 'pointerdown', 'contextmenu'
+    'click', 'mousedown', 'mouseup', 'keydown', 'keyup', 'dblclick',
+    'pointerdown', 'pointerup', 'touchstart', 'touchend', 'contextmenu'
 ];
 
 // Icon shapes: [tag, attributes] per child of a 24x24 stroke SVG
@@ -134,17 +135,31 @@ function playerMenuShield(event) {
  */
 function playerMenuOutsideClick(event) {
     if (!playerMenuEls) return;
-    const { button, menu } = playerMenuEls;
+    const { button, menu, player } = playerMenuEls;
     if (button.contains(event.target) || menu.contains(event.target)) return;
+    // A click on the video only dismisses the menu; it must not also toggle play
+    if (player.contains(event.target)) {
+        event.stopPropagation();
+        event.preventDefault();
+    }
     setPlayerMenuOpen(false, false);
 }
 
 /**
- * Close on Escape when focus is outside the menu
+ * @returns {boolean} True when keyboard focus is on the button or inside the menu
+ */
+function playerMenuHasFocus() {
+    if (!playerMenuEls) return false;
+    const active = document.activeElement;
+    return !!active && (playerMenuEls.button.contains(active) || playerMenuEls.menu.contains(active));
+}
+
+/**
+ * Close on Escape; focus returns to the button only if it was on the button or in the menu
  * @param {KeyboardEvent} event
  */
 function playerMenuDocumentKeydown(event) {
-    if (event.key === 'Escape' && playerMenuOpen) setPlayerMenuOpen(false, true);
+    if (event.key === 'Escape' && playerMenuOpen) setPlayerMenuOpen(false, playerMenuHasFocus());
 }
 
 /**
@@ -303,8 +318,10 @@ function buildPlayerMenu() {
     menu.appendChild(playerLook.block);
 
     PLAYER_MENU_BLOCKED_EVENTS.forEach(type => {
-        button.addEventListener(type, playerMenuShield);
-        menu.addEventListener(type, playerMenuShield);
+        // Only keydown may call preventDefault (Escape); the rest can be passive
+        const options = type === 'keydown' ? false : { passive: true };
+        button.addEventListener(type, playerMenuShield, options);
+        menu.addEventListener(type, playerMenuShield, options);
     });
 
     return {
@@ -380,7 +397,8 @@ function ensurePlayerMenu() {
         return false;
     }
 
-    const player = document.querySelector('#movie_player') || document.querySelector('#player-container');
+    const moviePlayer = document.querySelector('#movie_player');
+    const player = moviePlayer || document.querySelector('#player-container');
     if (!player) return false;
 
     const existing = player.querySelector('.em-player-btn');
@@ -391,6 +409,8 @@ function ensurePlayerMenu() {
             player.querySelectorAll(selector).forEach(el => el.remove());
         });
         playerMenuEls = buildPlayerMenu();
+        playerMenuEls.player = player;
+        playerMenuEls.onFallback = !moviePlayer;
         player.appendChild(playerMenuEls.button);
         player.appendChild(playerMenuEls.menu);
     }
@@ -400,7 +420,8 @@ function ensurePlayerMenu() {
 }
 
 /**
- * Mount the menu, retrying briefly while YouTube builds the player
+ * Mount the menu, retrying briefly while YouTube builds the player.
+ * Keeps retrying while mounted on the #player-container fallback so it can move into #movie_player.
  * @param {number} [attempt]
  */
 function schedulePlayerMenu(attempt = 0) {
@@ -408,7 +429,8 @@ function schedulePlayerMenu(attempt = 0) {
         clearTimeout(playerMenuRetryTimer);
         playerMenuRetryTimer = null;
     }
-    if (ensurePlayerMenu() || !isOnVideoPage() || attempt >= PLAYER_MENU_MAX_RETRIES) return;
+    const mounted = ensurePlayerMenu();
+    if ((mounted && !playerMenuEls.onFallback) || !isOnVideoPage() || attempt >= PLAYER_MENU_MAX_RETRIES) return;
     playerMenuRetryTimer = setTimeout(() => schedulePlayerMenu(attempt + 1), PLAYER_MENU_RETRY_MS);
 }
 

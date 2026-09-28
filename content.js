@@ -166,6 +166,19 @@ async function runModeLogic(generation = ++modeApplyGeneration, reason = 'direct
     }
 }
 
+/**
+ * Decide whether the current video should play in audio mode.
+ * A per-video manual override beats the auto mode; otherwise the mode decides.
+ * @param {{ override: boolean|null, mode: string, inList: boolean }} input
+ * @returns {{ audio: boolean, reason: 'manual'|'all'|'none'|'inList'|'notInList' }}
+ */
+function decideAudio({ override, mode, inList }) {
+    if (override === true || override === false) return { audio: override, reason: 'manual' };
+    if (mode === 'always') return { audio: true, reason: 'all' };
+    if (mode === 'off') return { audio: false, reason: 'none' };
+    return inList ? { audio: true, reason: 'inList' } : { audio: false, reason: 'notInList' };
+}
+
 async function applyModeLogic(generation = modeApplyGeneration) {
     // Only apply on video pages
     if (!isOnVideoPage()) {

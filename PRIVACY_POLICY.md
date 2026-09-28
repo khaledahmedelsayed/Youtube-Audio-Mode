@@ -39,13 +39,9 @@ To save your settings, your list and your statistics in your browser.
 
 To let the popup reach the YouTube tab you have open, so it can show which video and channel are playing and switch that video between video and audio.
 
-### scripting
+### Host permission (www.youtube.com)
 
-Declared for running Earmode on YouTube watch pages, where it lowers the video quality, covers the player while you listen and adds the Earmode button.
-
-### Host permission (youtube.com/watch)
-
-To work on YouTube video pages only. Earmode does not run on any other website.
+Earmode's script loads on www.youtube.com pages. This is needed because YouTube changes pages without reloading, so Earmode has to be present when you move from the home page or a search to a video. It only acts on video (watch) pages, where it lowers the video quality, covers the player while you listen and adds the Earmode button. Earmode does not run on any other website.
 
 ## Third-Party Services
 

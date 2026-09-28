@@ -60,6 +60,10 @@
             "resources": [
                 "overlay.css",
                 "fonts/Cairo-Variable.ttf",
+                "fonts/Fredoka-Latin.woff2",
+                "fonts/Fredoka-LatinExt.woff2",
+                "fonts/NunitoSans-Latin.woff2",
+                "fonts/NunitoSans-LatinExt.woff2",
                 "_locales/en/messages.json",
                 "_locales/ar/messages.json"
             ],

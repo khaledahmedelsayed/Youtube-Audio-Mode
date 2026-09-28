@@ -53,6 +53,8 @@
     cursor: pointer;
     backdrop-filter: blur(6px);
     opacity: 0;
+    /* Hidden, it must not catch clicks meant for the video; Tab still reaches it */
+    pointer-events: none;
     transition: opacity .25s ease;
 }
 
@@ -64,6 +66,7 @@
 .em-player-btn[aria-expanded="true"],
 .em-player-btn:focus-visible {
     opacity: 1;
+    pointer-events: auto;
 }
 
 .em-pm-led {

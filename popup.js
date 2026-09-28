@@ -13,7 +13,7 @@ const {
     sumMonthSeconds,
     savedMegabytes,
     formatSavedAmount,
-    fillTemplate,
+    modeHint,
     videoChannels,
     channelsInList,
     toggleChannels
@@ -31,11 +31,6 @@ const REASON_KEYS = {
     inList: 'reasonInList',
     notInList: 'reasonNotInList',
     none: 'reasonNone'
-};
-
-const HINT_KEYS = {
-    always: 'hintEverything',
-    off: 'hintNothing'
 };
 
 const $ = id => document.getElementById(id);
@@ -79,6 +74,7 @@ const state = {
 
 let statusRefreshTimer = null;
 let toastTimer = null;
+let channelWritePending = false;
 
 // ---------- messaging ----------
 
@@ -151,6 +147,9 @@ async function applyLanguage(lang) {
     document.querySelectorAll('[data-i18n]').forEach(el => {
         el.textContent = t(el.getAttribute('data-i18n'));
     });
+    document.querySelectorAll('[data-i18n-aria-label]').forEach(el => {
+        el.setAttribute('aria-label', t(el.getAttribute('data-i18n-aria-label')));
+    });
 
     els.langBtn.textContent = isArabic ? 'EN' : 'ع';
     els.langBtn.title = t('languageLabel');
@@ -161,6 +160,15 @@ async function applyLanguage(lang) {
 }
 
 // ---------- rendering ----------
+
+/**
+ * Set text only when it differs, so the aria-live state line is not re-announced.
+ * @param {HTMLElement} el
+ * @param {string} text
+ */
+function setText(el, text) {
+    if (el.textContent !== text) el.textContent = text;
+}
 
 /**
  * Pick a stable avatar colour from a channel name.
@@ -190,7 +198,7 @@ function renderState() {
     const showMessage = key => {
         els.statePill.hidden = true;
         els.backToAuto.hidden = true;
-        els.stateText.textContent = key ? t(key) : '';
+        setText(els.stateText, key ? t(key) : '');
     };
 
     if (!state.onWatch) return showMessage('noVideoSwitch');
@@ -199,8 +207,8 @@ function renderState() {
     if (!state.status.onVideo) return showMessage('noVideoSwitch');
 
     els.statePill.hidden = false;
-    els.statePill.textContent = t(state.status.audio ? 'nowAudio' : 'nowVideo');
-    els.stateText.textContent = t(REASON_KEYS[state.status.reason] || 'reasonNone');
+    setText(els.statePill, t(state.status.audio ? 'nowAudio' : 'nowVideo'));
+    setText(els.stateText, t(REASON_KEYS[state.status.reason] || 'reasonNone'));
     els.backToAuto.hidden = state.status.reason !== 'manual';
 }
 
@@ -222,6 +230,7 @@ function renderChannel() {
     els.channelAdd.dataset.in = String(inList);
     els.channelAdd.setAttribute('aria-pressed', String(inList));
     els.channelAdd.textContent = t(inList ? 'inYourList' : 'alwaysListen');
+    els.channelAdd.disabled = channelWritePending;
 }
 
 function renderMode() {
@@ -229,14 +238,7 @@ function renderMode() {
         button.setAttribute('aria-pressed', String(button.dataset.mode === state.mode));
     });
 
-    if (state.mode === 'filtered') {
-        const count = state.filterRules.whitelist.channels.length;
-        els.modeHint.textContent = count === 1
-            ? t('hintMyListOne')
-            : fillTemplate(t('hintMyList'), { count });
-    } else {
-        els.modeHint.textContent = t(HINT_KEYS[state.mode]);
-    }
+    els.modeHint.textContent = modeHint(state.mode, state.filterRules.whitelist.channels.length, t);
 }
 
 function renderLooks() {
@@ -278,10 +280,31 @@ function showToast(message) {
 // ---------- actions ----------
 
 /**
+ * Write to sync storage; on failure run `restore`, re-render and show an error toast.
+ * @param {object} items
+ * @param {function(): void} restore Puts the previous popup state back
+ * @returns {Promise<boolean>} True when the write succeeded
+ */
+async function saveSync(items, restore) {
+    try {
+        await chrome.storage.sync.set(items);
+        return true;
+    } catch (error) {
+        console.error('[Earmode] Failed to save settings:', error);
+        restore();
+        render();
+        showToast(t('saveFailed'));
+        return false;
+    }
+}
+
+/**
  * @param {boolean} audio
  */
 async function setVideoAudio(audio) {
     if (!state.status?.onVideo) return;
+    // Clicking the side that is already playing does nothing unless it was a manual pick
+    if (state.status.audio === audio && state.status.reason !== 'manual') return;
     state.status = { ...state.status, audio, reason: 'manual', override: audio };
     render();
     await sendToTab({ action: 'setVideoAudio', audio });
@@ -295,17 +318,30 @@ async function backToAuto() {
 
 async function toggleCurrentChannels() {
     const channels = videoChannels(state.videoInfo);
-    if (channels.length === 0) return;
+    if (channels.length === 0 || channelWritePending) return;
 
-    const { filterRules } = await chrome.storage.sync.get(['filterRules']);
-    const wasInList = channelsInList(filterRules, channels);
-    const nextRules = toggleChannels(filterRules, channels, Date.now());
+    channelWritePending = true;
+    const previousRules = state.filterRules;
+    try {
+        const { filterRules } = await chrome.storage.sync.get(['filterRules']);
+        const wasInList = channelsInList(filterRules, channels);
+        state.filterRules = toggleChannels(filterRules, channels, Date.now());
+        render();
 
-    state.filterRules = nextRules;
-    render();
-    await chrome.storage.sync.set({ filterRules: nextRules });
-    showToast(t(wasInList ? 'removedFromList' : 'addedToList'));
-    scheduleStatusRefresh(RULES_REFRESH_MS);
+        const saved = await saveSync({ filterRules: state.filterRules }, () => {
+            state.filterRules = previousRules;
+        });
+        if (saved) {
+            showToast(t(wasInList ? 'removedFromList' : 'addedToList'));
+            scheduleStatusRefresh(RULES_REFRESH_MS);
+        }
+    } catch (error) {
+        console.error('[Earmode] Failed to read the channel list:', error);
+        showToast(t('saveFailed'));
+    } finally {
+        channelWritePending = false;
+        render();
+    }
 }
 
 /**
@@ -313,9 +349,13 @@ async function toggleCurrentChannels() {
  */
 async function selectMode(mode) {
     if (!VALID_MODE_TYPES.has(mode) || mode === state.mode) return;
+    const previousMode = state.mode;
     state.mode = mode;
     render();
-    await chrome.storage.sync.set({ audioModeType: mode });
+    const saved = await saveSync({ audioModeType: mode }, () => {
+        state.mode = previousMode;
+    });
+    if (!saved) return;
     await sendToTab({ action: 'modeChanged', mode });
     scheduleStatusRefresh(RULES_REFRESH_MS);
 }
@@ -325,23 +365,31 @@ async function selectMode(mode) {
  */
 async function selectLook(look) {
     if (!PLAYER_LOOKS.includes(look) || look === state.look) return;
+    const previousLook = state.look;
     state.look = look;
     render();
-    await chrome.storage.sync.set({ playerLook: look });
-    await sendToTab({ action: 'playerLookChanged', look });
+    const saved = await saveSync({ playerLook: look }, () => {
+        state.look = previousLook;
+    });
+    if (saved) await sendToTab({ action: 'playerLookChanged', look });
 }
 
 async function toggleLanguage() {
     const lang = getLanguage() === 'ar' ? 'en' : 'ar';
-    await chrome.storage.sync.set({ language: lang });
+    const saved = await saveSync({ language: lang }, () => { });
+    if (!saved) return;
     await applyLanguage(lang);
     render();
     await sendToTab({ action: 'updateLanguage', language: lang });
 }
 
-function openStats() {
-    chrome.storage.session?.set({ optionsSection: 'stats' }).catch(() => { });
-    chrome.runtime.openOptionsPage();
+async function openStats() {
+    try {
+        await chrome.storage.session?.set({ optionsSection: 'stats' });
+    } catch (error) {
+        // The options page opens on its default section
+    }
+    chrome.runtime.openOptionsPage().catch(() => { });
 }
 
 // ---------- wiring ----------
@@ -358,8 +406,17 @@ els.lookButtons.forEach(button => {
     button.addEventListener('click', () => selectLook(button.dataset.look));
 });
 els.langBtn.addEventListener('click', toggleLanguage);
-els.gearBtn.addEventListener('click', () => chrome.runtime.openOptionsPage());
+els.gearBtn.addEventListener('click', () => chrome.runtime.openOptionsPage().catch(() => { }));
 els.stats.addEventListener('click', openStats);
+
+// Live status pushed by the content script whenever the video's state changes
+chrome.runtime.onMessage.addListener((message, sender) => {
+    if (message?.action !== 'earmodeState' || !message.status) return;
+    if (!state.tab?.id || sender.tab?.id !== state.tab.id) return;
+    state.status = message.status;
+    state.contentMissing = false;
+    render();
+});
 
 chrome.storage.onChanged.addListener((changes, namespace) => {
     if (namespace === 'sync') {

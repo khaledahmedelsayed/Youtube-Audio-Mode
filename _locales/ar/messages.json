@@ -402,5 +402,17 @@
     "languageLabel": {
         "message": "اللغة",
         "description": "Tooltip and label of the language button"
+    },
+    "saveFailed": {
+        "message": "تعذر الحفظ. حاول مرة أخرى.",
+        "description": "Toast when a setting could not be saved"
+    },
+    "hintMyListEmpty": {
+        "message": "اضغط استمع دائمًا على أي فيديو لبدء قائمتك.",
+        "description": "Hint under My list when the list is empty"
+    },
+    "switchLabel": {
+        "message": "طريقة تشغيل هذا الفيديو",
+        "description": "Accessible name of the Video | Audio switch"
     }
 }

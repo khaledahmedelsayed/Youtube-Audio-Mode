@@ -175,6 +175,21 @@
     }
 
     /**
+     * Hint text under the auto-listen choices.
+     * @param {string} mode 'always' | 'filtered' | 'off'
+     * @param {number} channelCount Channels in the list
+     * @param {function(string): string} translate
+     * @returns {string}
+     */
+    function modeHint(mode, channelCount, translate) {
+        if (mode === 'always') return translate('hintEverything');
+        if (mode === 'off') return translate('hintNothing');
+        if (channelCount === 0) return translate('hintMyListEmpty');
+        if (channelCount === 1) return translate('hintMyListOne');
+        return fillTemplate(translate('hintMyList'), { count: channelCount });
+    }
+
+    /**
      * All channels of a video (collaborations included), deduped by id.
      * Falls back to the primary channelId/channelName.
      * @param {{channelId?: string, channelName?: string, channels?: Array<{id: string, name: string}>}|null} videoInfo
@@ -326,6 +341,7 @@
         savedMegabytes,
         formatSavedAmount,
         fillTemplate,
+        modeHint,
         videoChannels,
         channelsInList,
         toggleChannels

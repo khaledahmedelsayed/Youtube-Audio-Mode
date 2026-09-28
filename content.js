@@ -238,6 +238,14 @@ function emitEarmodeState() {
     if (typeof CustomEvent === 'function' && window.dispatchEvent) {
         window.dispatchEvent(new CustomEvent('earmode:state'));
     }
+    // Tell an open popup about the new state; nothing may be listening
+    if (chrome.runtime?.id) {
+        try {
+            chrome.runtime.sendMessage({ action: 'earmodeState', status: getEarmodeStatus() })?.catch?.(() => { });
+        } catch (error) {
+            // Extension context invalidated
+        }
+    }
 }
 
 /**

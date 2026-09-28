@@ -140,3 +140,21 @@ test('enableAudioMode retry keeps the fromAutoRule flag', () => {
 
     assert.deepEqual(plain(retries), [[true]]);
 });
+
+test('state changes broadcast earmodeState to the extension', () => {
+    const api = loadContentScript(createTimers());
+    api.setRuntimeIdForTest('ext');
+    api.setVideoAudio(true);
+    const sent = JSON.parse(JSON.stringify(api.getSentRuntimeMessagesForTest()));
+    const last = sent[sent.length - 1];
+    assert.equal(last.action, 'earmodeState');
+    assert.equal(last.status.override, true);
+    assert.equal(last.status.reason !== undefined, true);
+});
+
+test('no earmodeState broadcast when the extension context is gone', () => {
+    const api = loadContentScript(createTimers());
+    api.setRuntimeIdForTest(null);
+    api.setVideoAudio(true);
+    assert.equal(api.getSentRuntimeMessagesForTest().length, 0);
+});

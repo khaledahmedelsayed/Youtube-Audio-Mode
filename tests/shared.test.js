@@ -207,3 +207,20 @@ test('fillTemplate replaces named placeholders', () => {
     assert.equal(api.fillTemplate('Saved {amount} this month', { amount: '2.3 GB' }), 'Saved 2.3 GB this month');
     assert.equal(api.fillTemplate('No {missing}', {}), 'No {missing}');
 });
+
+test('modeHint picks the hint for each auto-listen mode and list size', () => {
+    const api = loadShared();
+    const messages = {
+        hintEverything: 'Every video starts as audio.',
+        hintMyList: '{count} channels in your list.',
+        hintMyListOne: '1 channel in your list.',
+        hintMyListEmpty: 'Tap Always listen on a video to start your list.',
+        hintNothing: 'Videos start as normal video.'
+    };
+    const t = key => messages[key];
+    assert.equal(api.modeHint('always', 3, t), 'Every video starts as audio.');
+    assert.equal(api.modeHint('off', 3, t), 'Videos start as normal video.');
+    assert.equal(api.modeHint('filtered', 0, t), 'Tap Always listen on a video to start your list.');
+    assert.equal(api.modeHint('filtered', 1, t), '1 channel in your list.');
+    assert.equal(api.modeHint('filtered', 4, t), '4 channels in your list.');
+});

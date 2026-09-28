@@ -84,6 +84,11 @@ function loadContentScript(timers) {
         chrome: {
             runtime: {
                 id: null,
+                sentMessages: [],
+                sendMessage(message) {
+                    this.sentMessages.push(message);
+                    return Promise.reject(new Error('Could not establish connection. Receiving end does not exist.'));
+                },
                 onMessage: {
                     addListener() {}
                 }
@@ -170,6 +175,9 @@ globalThis.__audioModeTestApi = {
     },
     setRuntimeIdForTest(id) {
         chrome.runtime.id = id;
+    },
+    getSentRuntimeMessagesForTest() {
+        return chrome.runtime.sentMessages;
     },
     setModeForTest(mode) {
         currentModeType = mode;

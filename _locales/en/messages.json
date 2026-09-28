@@ -398,5 +398,17 @@
   "languageLabel": {
     "message": "Language",
     "description": "Tooltip and label of the language button"
+  },
+  "saveFailed": {
+    "message": "Could not save. Try again.",
+    "description": "Toast when a setting could not be saved"
+  },
+  "hintMyListEmpty": {
+    "message": "Tap Always listen on a video to start your list.",
+    "description": "Hint under My list when the list is empty"
+  },
+  "switchLabel": {
+    "message": "How to play this video",
+    "description": "Accessible name of the Video | Audio switch"
   }
 }

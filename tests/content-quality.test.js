@@ -123,6 +123,7 @@ function loadContentScript(timers) {
 globalThis.__audioModeTestApi = {
     forceLowestQuality,
     clickQualitySetting,
+    extractPageChannels,
     setDocumentForTest(documentForTest) {
         globalThis.document = documentForTest;
     },
@@ -251,4 +252,34 @@ test('clickQualitySetting closes the settings popup when document Escape misses 
         pointerEvents: '',
         visibility: ''
     });
+});
+
+test('extractPageChannels ignores channel links outside the video owner box', () => {
+    const timers = createTimers();
+    const api = loadContentScript(timers);
+    const link = (href, text) => ({
+        getAttribute: name => (name === 'href' ? href : null),
+        textContent: text
+    });
+    const ownerLink = link('/@yehiatech', 'Yehia Tech');
+    const strayLink = link('/channel/UCkhaled', 'Khaled Ahmed');
+    const owner = {
+        querySelectorAll: () => [ownerLink]
+    };
+
+    api.setDocumentForTest({
+        querySelector: () => null,
+        querySelectorAll(selector) {
+            if (/ytd-video-owner-renderer$/.test(selector.trim())) return [owner];
+            if (selector.includes('/channel/')) return [ownerLink, strayLink];
+            return [ownerLink];
+        }
+    });
+
+    const channels = api.extractPageChannels();
+
+    assert.deepEqual(
+        Array.from(channels, channel => channel.name),
+        ['Yehia Tech']
+    );
 });

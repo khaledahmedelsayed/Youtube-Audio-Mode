@@ -606,27 +606,21 @@ function dedupeChannels(channels) {
     });
 }
 
+/**
+ * Read channels only from the video's own owner box.
+ * Page-wide selectors picked up stray links (e.g. stale nodes left by SPA
+ * navigation), which added unrelated channels such as the signed-in user.
+ */
 function extractPageChannels() {
-    const scopedSelectors = [
-        '#owner ytd-channel-name a',
-        'ytd-video-owner-renderer ytd-channel-name a',
-        '#upload-info ytd-channel-name a',
-        '#owner a[href^="/channel/"]',
-        '#owner a[href^="/@"]',
-        'ytd-watch-metadata #owner a[href^="/channel/"]',
-        'ytd-watch-metadata #owner a[href^="/@"]',
-        'ytd-watch-metadata #upload-info a[href^="/channel/"]',
-        'ytd-watch-metadata #upload-info a[href^="/@"]',
-        'ytd-watch-metadata #byline-container a[href^="/channel/"]',
-        'ytd-watch-metadata #byline-container a[href^="/@"]',
-        'ytd-watch-metadata ytd-channel-name a'
-    ];
+    const owners = Array.from(document.querySelectorAll('ytd-watch-metadata ytd-video-owner-renderer'));
+    const owner = owners.find(el => el.offsetParent !== null) || owners[0];
+    if (!owner) return [];
 
-    const channels = scopedSelectors.flatMap(selector =>
-        Array.from(document.querySelectorAll(selector))
-            .map(parseChannelLink)
-            .filter(Boolean)
-    );
+    const channels = Array.from(
+        owner.querySelectorAll('ytd-channel-name a, a[href^="/channel/"], a[href^="/@"]')
+    )
+        .map(parseChannelLink)
+        .filter(Boolean);
 
     return dedupeChannels(channels);
 }

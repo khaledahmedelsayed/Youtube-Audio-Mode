@@ -141,7 +141,10 @@ globalThis.__audioModeTestApi = {
         location.search = search;
         location.href = 'https://www.youtube.com' + location.pathname + search;
     },
-    decideAudio
+    decideAudio,
+    getEarmodeStatus,
+    setVideoAudio,
+    clearOverride
 };`, context);
 
     return context.__audioModeTestApi;

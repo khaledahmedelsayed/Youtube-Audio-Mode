@@ -18,3 +18,33 @@ test('decideAudio: auto modes', () => {
     assert.deepEqual(plain(api.decideAudio({ override: null, mode: 'filtered', inList: true })), { audio: true, reason: 'inList' });
     assert.deepEqual(plain(api.decideAudio({ override: null, mode: 'filtered', inList: false })), { audio: false, reason: 'notInList' });
 });
+
+test('setVideoAudio sets an override for the current video only', () => {
+    const api = loadContentScript(createTimers());
+    assert.equal(api.getEarmodeStatus().override, null);
+
+    api.setVideoAudio(true);
+    assert.equal(api.getEarmodeStatus().override, true);
+
+    api.setSearchForTest('?v=other');
+    assert.equal(api.getEarmodeStatus().override, null);
+});
+
+test('clearOverride returns the video to auto', () => {
+    const api = loadContentScript(createTimers());
+    api.setVideoAudio(false);
+    assert.equal(api.getEarmodeStatus().override, false);
+
+    api.clearOverride();
+    assert.equal(api.getEarmodeStatus().override, null);
+});
+
+test('getEarmodeStatus reports page, audio, reason and mode', () => {
+    const api = loadContentScript(createTimers());
+    const status = plain(api.getEarmodeStatus());
+    assert.equal(status.onVideo, true);
+    assert.equal(status.audio, false);
+    assert.equal(status.reason, 'none');
+    assert.equal(typeof status.mode, 'string');
+    assert.equal(status.override, null);
+});

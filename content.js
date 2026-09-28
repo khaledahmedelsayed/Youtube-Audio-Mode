@@ -53,6 +53,8 @@ let modeApplyTimeout = null;
 let modeApplyGeneration = 0;
 let modeApplyInProgress = false;
 let modeApplyQueued = false;
+let manualOverride = null; // { videoId, audio } - per-video manual switch
+let lastDecision = { audio: false, reason: 'none' };
 
 // Quality operation locking state - prevents duplicate popup openings
 let qualityOperationInProgress = false;
@@ -179,6 +181,91 @@ function decideAudio({ override, mode, inList }) {
     return inList ? { audio: true, reason: 'inList' } : { audio: false, reason: 'notInList' };
 }
 
+/**
+ * Get the video ID from the current URL
+ * @returns {string|null}
+ */
+function getCurrentVideoId() {
+    return new URLSearchParams(window.location.search).get('v');
+}
+
+/**
+ * Get the manual override for the current video, if any.
+ * An override for a different video is stale and gets cleared.
+ * @returns {boolean|null}
+ */
+function getActiveOverride() {
+    if (manualOverride && manualOverride.videoId === getCurrentVideoId()) {
+        return manualOverride.audio;
+    }
+    manualOverride = null;
+    return null;
+}
+
+/**
+ * Notify listeners (e.g. the in-page control) that the audio state changed
+ */
+function emitEarmodeState() {
+    if (typeof CustomEvent === 'function' && window.dispatchEvent) {
+        window.dispatchEvent(new CustomEvent('earmode:state'));
+    }
+}
+
+/**
+ * Apply an audio decision to the current video
+ * @param {{ audio: boolean }} decision
+ */
+function applyDecision({ audio }) {
+    if (audio) {
+        if (!audioModeEnabled) {
+            enableAudioMode(true); // fromAutoRule = true, don't persist
+        } else {
+            // Already enabled but navigated to new video - re-apply quality
+            setLowestQuality();
+        }
+    } else {
+        if (audioModeEnabled) {
+            disableAudioMode(true);
+        } else {
+            // Not in audio mode - apply user's preferred quality
+            applyPreferredQuality();
+        }
+    }
+    emitEarmodeState();
+}
+
+/**
+ * Current audio status for the popup and in-page control
+ */
+function getEarmodeStatus() {
+    return {
+        onVideo: isOnVideoPage(),
+        audio: audioModeEnabled,
+        reason: lastDecision.reason,
+        mode: currentModeType,
+        override: getActiveOverride()
+    };
+}
+
+/**
+ * Manually switch audio on/off for the current video only
+ * @param {boolean} audio
+ */
+function setVideoAudio(audio) {
+    manualOverride = { videoId: getCurrentVideoId(), audio: !!audio };
+    emitEarmodeState();
+    scheduleModeLogic('manual switch', 0);
+}
+
+/**
+ * Drop the manual override so the auto mode decides again
+ */
+function clearOverride() {
+    manualOverride = null;
+    emitEarmodeState();
+    scheduleModeLogic('back to auto', 0);
+}
+
 async function applyModeLogic(generation = modeApplyGeneration) {
     // Only apply on video pages
     if (!isOnVideoPage()) {
@@ -189,21 +276,18 @@ async function applyModeLogic(generation = modeApplyGeneration) {
         return;
     }
 
-    if (currentModeType === 'off') {
-        // Off mode: disable audio mode, use preferred quality
-        if (audioModeEnabled) {
-            disableAudioMode(true);
-        } else {
-            applyPreferredQuality();
-        }
-    } else if (currentModeType === 'always') {
-        // Always On mode: enable audio mode on all videos
-        if (!audioModeEnabled) {
-            enableAudioMode(true); // fromAutoRule = true, don't persist
-        } else {
-            // Already enabled but navigated to new video - re-apply quality
-            setLowestQuality();
-        }
+    // A manual switch for this video wins - no need to scrape the page
+    const override = getActiveOverride();
+    if (override !== null) {
+        lastDecision = decideAudio({ override, mode: currentModeType, inList: false });
+        applyDecision(lastDecision);
+        return;
+    }
+
+    if (currentModeType === 'off' || currentModeType === 'always') {
+        // Off: normal playback. Always On: audio mode on all videos.
+        lastDecision = decideAudio({ override: null, mode: currentModeType, inList: false });
+        applyDecision(lastDecision);
     } else {
         // Filtered mode: check filter rules
         await applyFilteredMode(0, generation);
@@ -340,6 +424,7 @@ async function applyFilteredMode(retryCount = 0, generation = modeApplyGeneratio
             }
 
             // Max retries reached - disable audio mode
+            lastDecision = { audio: false, reason: 'notInList' };
             if (audioModeEnabled) {
                 console.log('[Audio Mode] No video info after retries - disabling');
                 disableAudioMode(true);
@@ -354,26 +439,8 @@ async function applyFilteredMode(retryCount = 0, generation = modeApplyGeneratio
         const shouldEnable = checkWhitelist(videoInfo, result.filterRules);
         console.log('[Audio Mode] Should enable:', shouldEnable);
 
-        if (shouldEnable) {
-            if (!audioModeEnabled) {
-                console.log('[Audio Mode] Whitelist match - enabling');
-                enableAudioMode(true);
-            } else {
-                // Already enabled but navigated to new video - re-apply quality
-                console.log('[Audio Mode] Already enabled, re-applying 144p quality');
-                setLowestQuality();
-            }
-        } else {
-            // No match - normal video
-            if (audioModeEnabled) {
-                console.log('[Audio Mode] No whitelist match - disabling');
-                disableAudioMode(true);
-            } else {
-                // Not in audio mode - apply user's preferred quality
-                console.log('[Audio Mode] Normal video - applying preferred quality');
-                applyPreferredQuality();
-            }
-        }
+        lastDecision = decideAudio({ override: null, mode: 'filtered', inList: shouldEnable });
+        applyDecision(lastDecision);
     } catch (error) {
         console.error('[Audio Mode] Error in filtered mode:', error);
     }
@@ -707,7 +774,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         scheduleModeLogic('popup mode change', 50);
         sendResponse({ success: true });
     } else if (request.action === 'getStatus') {
-        sendResponse({ enabled: audioModeEnabled, mode: currentModeType });
+        sendResponse(getEarmodeStatus());
+    } else if (request.action === 'setVideoAudio') {
+        setVideoAudio(request.audio);
+        sendResponse({ ok: true });
+    } else if (request.action === 'clearOverride') {
+        clearOverride();
+        sendResponse({ ok: true });
     } else if (request.action === 'updateTheme') {
         updateOverlayTheme(request.backgroundType, request.backgroundValue);
     } else if (request.action === 'updateLanguage') {
@@ -820,6 +893,8 @@ async function enableAudioMode(fromAutoRule = false) {
 
     // Start tracking usage for data saved stats
     startUsageTracking();
+
+    emitEarmodeState();
 }
 
 function disableAudioMode(fromAutoRule = false) {
@@ -883,6 +958,8 @@ function disableAudioMode(fromAutoRule = false) {
 
     // Stop tracking usage
     stopUsageTracking();
+
+    emitEarmodeState();
 }
 
 // Track current quality setting operation to cancel stale callbacks

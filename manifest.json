@@ -12,7 +12,7 @@
         "activeTab"
     ],
     "host_permissions": [
-        "https://www.youtube.com/watch*"
+        "https://www.youtube.com/*"
     ],
     "action": {
         "default_popup": "popup.html",
@@ -58,7 +58,6 @@
     "web_accessible_resources": [
         {
             "resources": [
-                "overlay.css",
                 "fonts/Cairo-Variable.ttf",
                 "fonts/Fredoka-Latin.woff2",
                 "fonts/Fredoka-LatinExt.woff2",

@@ -33,6 +33,9 @@ const QUALITY = {
     RESTORE: 'hd720' // 720p
 };
 
+// Qualities worth restoring after audio mode (same list as the options page)
+const RESTORABLE_QUALITIES = new Set(['hd2160', 'hd1440', 'hd1080', 'hd720', 'large', 'medium', 'auto']);
+
 const LOWEST_QUALITY_RETRY = {
     MAX_ATTEMPTS: 3
 };
@@ -117,7 +120,7 @@ async function loadMessages(lang) {
 // Initialize by checking saved preference
 if (chrome.runtime?.id) {
     try {
-        chrome.storage.sync.get(['audioModeType', 'language', 'preferredQuality', 'playerLook'], async function (result) {
+        chrome.storage.sync.get(['audioModeType', 'language', 'playerLook'], async function (result) {
             if (chrome.runtime.lastError) {
                 console.log('[Earmode] Could not load initial state:', chrome.runtime.lastError);
                 return;
@@ -132,11 +135,6 @@ if (chrome.runtime?.id) {
                 await loadMessages(detectedLang);
             }
 
-            // Load user's preferred quality (for restore after audio mode)
-            if (result.preferredQuality) {
-                savedQualityBeforeAudioMode = result.preferredQuality;
-                console.log('[Earmode] Loaded preferred quality:', savedQualityBeforeAudioMode);
-            }
 
             // Set the current mode type
             currentModeType = result.audioModeType || 'always';
@@ -904,16 +902,14 @@ async function enableAudioMode(fromAutoRule = false) {
         return;
     }
 
-    // Save current quality before changing (to restore later)
-    // Only save if NOT already in audio mode quality (tiny/small)
+    // Remember the current quality in memory, used on restore when no preferred
+    // quality is stored. The stored preference is only set on the options page.
     const player = document.getElementById('movie_player');
     if (player && player.getPlaybackQuality) {
         const currentQuality = player.getPlaybackQuality();
-        // Only save if it's a real quality (not audio mode's 144p/240p)
-        if (currentQuality !== 'tiny' && currentQuality !== 'small') {
+        // Skip audio mode's own 144p/240p and values YouTube cannot be set back to
+        if (RESTORABLE_QUALITIES.has(currentQuality)) {
             savedQualityBeforeAudioMode = currentQuality;
-            // Persist to storage so it survives page reloads
-            chrome.storage.sync.set({ preferredQuality: currentQuality });
             console.log('[Earmode] Saved quality:', savedQualityBeforeAudioMode);
         }
     }
@@ -1329,7 +1325,7 @@ function restoreQuality() {
 
 /**
  * Internal: Restore quality to user's previous setting
- * Uses saved quality from session, falls back to stored preference, then 720p
+ * Uses the stored preference, falls back to the quality from before audio mode, then 720p
  * @param {Function} onComplete - Callback when operation completes
  * @param {number} attempts - Number of retry attempts remaining
  */
@@ -1364,14 +1360,13 @@ const restoreQualityInternal = (onComplete = null, attempts = 3) => {
                 'auto': 'Auto'
             };
 
-            // Use saved quality from session, then stored preference, then 720p
+            // Use the stored preference, then the quality from before audio mode, then 720p
             // NEVER restore to audio mode qualities (tiny/small)
-            let target = savedQualityBeforeAudioMode;
-            if (!target || target === 'tiny' || target === 'small') {
-                // Fall back to stored preference (last quality user used)
-                target = result.preferredQuality;
+            let target = result.preferredQuality;
+            if (!RESTORABLE_QUALITIES.has(target)) {
+                target = savedQualityBeforeAudioMode;
             }
-            if (!target || target === 'tiny' || target === 'small') {
+            if (!RESTORABLE_QUALITIES.has(target)) {
                 // Last resort: 720p
                 target = QUALITY.RESTORE;
             }

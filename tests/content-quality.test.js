@@ -150,3 +150,42 @@ test('extractPageChannels ignores channel links outside the video owner box', ()
         ['Yehia Tech']
     );
 });
+
+/**
+ * Enable audio mode on a fake page whose player reports the given quality
+ * @returns {Promise<{ api: object, syncWrites: object[] }>}
+ */
+async function enableWithPlayerQuality(quality) {
+    const api = loadContentScript(createTimers());
+    const syncWrites = [];
+    api.context.chrome.storage.sync.set = values => syncWrites.push(JSON.parse(JSON.stringify(values)));
+    const video = { style: {}, readyState: 0, paused: true, addEventListener() {}, removeEventListener() {} };
+    const player = { getPlaybackQuality: () => quality };
+    api.setDocumentForTest({
+        body: {},
+        contains: () => true,
+        getElementById: id => (id === 'movie_player' ? player : null),
+        querySelector: selector => (selector === 'video' ? video : null),
+        querySelectorAll: () => [],
+        addEventListener() {},
+        dispatchEvent() {}
+    });
+    api.clearVideoCacheForTest();
+    await api.enableAudioMode(true).catch(() => {});
+    return { api, syncWrites };
+}
+
+const savedQuality = api => require('node:vm').runInContext('savedQualityBeforeAudioMode', api.context);
+
+test('enabling audio mode does not store the player quality as preferredQuality', async () => {
+    const { api, syncWrites } = await enableWithPlayerQuality('hd1080');
+    assert.equal(syncWrites.some(values => 'preferredQuality' in values), false);
+    assert.equal(savedQuality(api), 'hd1080');
+});
+
+test('enabling audio mode only remembers qualities it can restore', async () => {
+    for (const quality of ['unknown', 'highres', 'tiny', 'small']) {
+        const { api } = await enableWithPlayerQuality(quality);
+        assert.equal(savedQuality(api), null, quality);
+    }
+});

@@ -159,7 +159,11 @@ function playerMenuHasFocus() {
  * @param {KeyboardEvent} event
  */
 function playerMenuDocumentKeydown(event) {
-    if (event.key === 'Escape' && playerMenuOpen) setPlayerMenuOpen(false, playerMenuHasFocus());
+    if (event.key !== 'Escape' || !playerMenuOpen) return;
+    // This Escape only closes the menu; YouTube should not also act on it
+    event.preventDefault();
+    event.stopPropagation();
+    setPlayerMenuOpen(false, playerMenuHasFocus());
 }
 
 /**

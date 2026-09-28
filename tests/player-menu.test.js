@@ -244,19 +244,29 @@ test('direction follows the language and the menu leaves non-video pages', () =>
     assert.equal(player.children.length, 0);
 });
 
+/**
+ * An Escape keydown that records stopPropagation and preventDefault
+ */
+function escapeEvent() {
+    const event = { key: 'Escape', stopped: false, prevented: false };
+    event.stopPropagation = () => { event.stopped = true; };
+    event.preventDefault = () => { event.prevented = true; };
+    return event;
+}
+
 test('Escape from outside the menu closes it without moving focus', () => {
     const { ctx, player, doc, docListeners } = setupMenu();
     ctx.ensurePlayerMenu();
     buttonOf(player).dispatch('click');
     FakeElement.focused = null;
     doc.activeElement = new FakeElement('input');
-    docListeners.keydown.forEach(entry => entry.fn({ key: 'Escape' }));
+    docListeners.keydown.forEach(entry => entry.fn(escapeEvent()));
     assert.equal(menuOf(player).hidden, true);
     assert.equal(FakeElement.focused, null);
 
     buttonOf(player).dispatch('click');
     doc.activeElement = menuOf(player).querySelector('.em-pm-mode');
-    docListeners.keydown.forEach(entry => entry.fn({ key: 'Escape' }));
+    docListeners.keydown.forEach(entry => entry.fn(escapeEvent()));
     assert.equal(FakeElement.focused, buttonOf(player));
 });
 
@@ -378,4 +388,17 @@ test('removePlayerMenu while open drops the document listeners', () => {
     assert.equal(docListeners.click.length, 0);
     assert.equal(docListeners.keydown.length, 0);
     assert.equal(player.children.length, 0);
+});
+
+test('document Escape that closes the menu does not reach YouTube', () => {
+    const { ctx, player, doc, docListeners } = setupMenu();
+    ctx.ensurePlayerMenu();
+
+    buttonOf(player).dispatch('click');
+    doc.activeElement = new FakeElement('input');
+    const closing = escapeEvent();
+    docListeners.keydown.forEach(entry => entry.fn(closing));
+    assert.equal(menuOf(player).hidden, true);
+    assert.equal(closing.stopped, true);
+    assert.equal(closing.prevented, true);
 });

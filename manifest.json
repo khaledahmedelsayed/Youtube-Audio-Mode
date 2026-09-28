@@ -9,8 +9,7 @@
     "homepage_url": "https://github.com/khaledahmedelsayed/Youtube-Audio-Mode",
     "permissions": [
         "storage",
-        "activeTab",
-        "scripting"
+        "activeTab"
     ],
     "host_permissions": [
         "https://www.youtube.com/watch*"

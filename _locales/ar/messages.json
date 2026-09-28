@@ -1,10 +1,14 @@
 {
     "appName": {
-        "message": "وضع الصوت في يوتيوب",
+        "message": "Earmode: صوت فقط ليوتيوب",
         "description": "Extension name"
     },
+    "appShortName": {
+        "message": "Earmode",
+        "description": "Short extension name"
+    },
     "extDescription": {
-        "message": "شغّل فيديوهات يوتيوب في وضع الصوت فقط لتوفير استهلاك الإنترنت",
+        "message": "استمع إلى يوتيوب مع إيقاف الفيديو. اختر قنوات تُشغَّل دائمًا كصوت فقط ووفّر بيانات الجوال.",
         "description": "Extension description shown in Chrome Web Store"
     },
     "thisMonth": {

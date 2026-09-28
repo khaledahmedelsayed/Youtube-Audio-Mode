@@ -1,4 +1,4 @@
-// Background script for YouTube Audio Mode
+// Background script for Earmode
 // Handles badge updates
 
 // Initialize state on install
@@ -34,13 +34,18 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
     }
 });
 
+function setBadgeColors() {
+    chrome.action.setBadgeBackgroundColor({ color: '#F2C14E' });
+    if (chrome.action.setBadgeTextColor) chrome.action.setBadgeTextColor({ color: '#1C1B22' });
+}
+
 function updateBadge(modeType) {
     if (modeType === 'always') {
-        chrome.action.setBadgeText({ text: 'ON' });
-        chrome.action.setBadgeBackgroundColor({ color: '#667eea' });
+        chrome.action.setBadgeText({ text: 'A' });
+        setBadgeColors();
     } else if (modeType === 'filtered') {
-        chrome.action.setBadgeText({ text: 'FLT' });
-        chrome.action.setBadgeBackgroundColor({ color: '#667eea' });
+        chrome.action.setBadgeText({ text: 'L' });
+        setBadgeColors();
     } else {
         // Off mode - no badge
         chrome.action.setBadgeText({ text: '' });
@@ -54,9 +59,9 @@ function monitorStorageQuota() {
         const usagePercent = (bytes / quotaLimit) * 100;
 
         if (usagePercent > 90) {
-            console.warn(`[Audio Mode] Storage quota at ${usagePercent.toFixed(1)}% (${bytes}/${quotaLimit} bytes)`);
+            console.warn(`[Earmode] Storage quota at ${usagePercent.toFixed(1)}% (${bytes}/${quotaLimit} bytes)`);
         } else {
-            console.log(`[Audio Mode] Storage usage: ${usagePercent.toFixed(1)}% (${bytes}/${quotaLimit} bytes)`);
+            console.log(`[Earmode] Storage usage: ${usagePercent.toFixed(1)}% (${bytes}/${quotaLimit} bytes)`);
         }
     });
 }

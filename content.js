@@ -1,4 +1,4 @@
-// YouTube Audio Mode - Content Script
+// Earmode - Content Script
 // This script runs on YouTube pages and enables audio-only playback
 
 // ===== HELPER: Check if on video page =====
@@ -119,7 +119,7 @@ if (chrome.runtime?.id) {
     try {
         chrome.storage.sync.get(['audioModeType', 'language', 'preferredQuality', 'playerLook'], async function (result) {
             if (chrome.runtime.lastError) {
-                console.log('[Audio Mode] Could not load initial state:', chrome.runtime.lastError);
+                console.log('[Earmode] Could not load initial state:', chrome.runtime.lastError);
                 return;
             }
 
@@ -135,7 +135,7 @@ if (chrome.runtime?.id) {
             // Load user's preferred quality (for restore after audio mode)
             if (result.preferredQuality) {
                 savedQualityBeforeAudioMode = result.preferredQuality;
-                console.log('[Audio Mode] Loaded preferred quality:', savedQualityBeforeAudioMode);
+                console.log('[Earmode] Loaded preferred quality:', savedQualityBeforeAudioMode);
             }
 
             // Set the current mode type
@@ -151,7 +151,7 @@ if (chrome.runtime?.id) {
             scheduleModeLogic('initial state', 0);
         });
     } catch (error) {
-        console.log('[Audio Mode] Error during initialization:', error);
+        console.log('[Earmode] Error during initialization:', error);
     }
 }
 
@@ -180,14 +180,14 @@ function scheduleModeLogic(reason = 'unknown', delay = 250) {
 async function runModeLogic(generation = ++modeApplyGeneration, reason = 'direct') {
     if (modeApplyInProgress) {
         modeApplyQueued = true;
-        console.log(`[Audio Mode] Mode logic already running, queued '${reason}'`);
+        console.log(`[Earmode] Mode logic already running, queued '${reason}'`);
         return;
     }
 
     modeApplyInProgress = true;
 
     try {
-        console.log(`[Audio Mode] Applying mode logic: ${reason}`);
+        console.log(`[Earmode] Applying mode logic: ${reason}`);
         await applyModeLogic(generation);
     } finally {
         modeApplyInProgress = false;
@@ -390,12 +390,12 @@ function applyPreferredQualityInternal(onComplete = null) {
             let fallback = availableLevels.find(q => qualityOrder.indexOf(q) >= preferredIndex);
             if (!fallback) fallback = 'auto';
 
-            console.log('[Audio Mode] Preferred quality', quality, 'not available, using:', fallback);
+            console.log('[Earmode] Preferred quality', quality, 'not available, using:', fallback);
             quality = fallback;
             uiTargetText = qualityToText[quality] || 'Auto';
         }
 
-        console.log('[Audio Mode] Applying preferred quality:', quality);
+        console.log('[Earmode] Applying preferred quality:', quality);
 
         try {
             // Try API methods first
@@ -411,14 +411,14 @@ function applyPreferredQualityInternal(onComplete = null) {
                 const currentQuality = player.getPlaybackQuality ? player.getPlaybackQuality() : 'unknown';
 
                 if (currentQuality !== quality) {
-                    console.log('[Audio Mode] API failed, using UI click for preferred quality');
+                    console.log('[Earmode] API failed, using UI click for preferred quality');
                     clickQualitySetting(video, uiTargetText, onComplete);
                 } else {
                     onComplete?.();
                 }
             }, 500);
         } catch (e) {
-            console.log('[Audio Mode] Could not apply preferred quality:', e);
+            console.log('[Earmode] Could not apply preferred quality:', e);
             onComplete?.();
         }
     });
@@ -449,13 +449,13 @@ async function applyFilteredMode(retryCount = 0, generation = modeApplyGeneratio
         if (generation !== modeApplyGeneration) return;
 
         const videoInfo = getCurrentVideoInfo();
-        console.log('[Audio Mode] Video info:', videoInfo, 'Retry:', retryCount);
+        console.log('[Earmode] Video info:', videoInfo, 'Retry:', retryCount);
 
         // If we can't get video info, retry a few times before giving up
         // Check for both channelId AND videoTitle to ensure keyword filtering works
         if (!videoInfo || !videoInfo.channelId || !videoInfo.videoTitle) {
             if (retryCount < MAX_RETRIES) {
-                console.log('[Audio Mode] No video info yet, retrying...');
+                console.log('[Earmode] No video info yet, retrying...');
                 setTimeout(() => {
                     if (generation === modeApplyGeneration) {
                         applyFilteredMode(retryCount + 1, generation);
@@ -465,7 +465,7 @@ async function applyFilteredMode(retryCount = 0, generation = modeApplyGeneratio
             }
 
             // Max retries reached - disable audio mode
-            console.log('[Audio Mode] No video info after retries - treating as not in list');
+            console.log('[Earmode] No video info after retries - treating as not in list');
             lastDecision = { audio: false, reason: 'notInList' };
             applyDecision(lastDecision);
             return;
@@ -476,12 +476,12 @@ async function applyFilteredMode(retryCount = 0, generation = modeApplyGeneratio
 
         // Check whitelist only
         const shouldEnable = checkWhitelist(videoInfo, result.filterRules);
-        console.log('[Audio Mode] Should enable:', shouldEnable);
+        console.log('[Earmode] Should enable:', shouldEnable);
 
         lastDecision = decideAudio({ override: null, mode: 'filtered', inList: shouldEnable });
         applyDecision(lastDecision);
     } catch (error) {
-        console.error('[Audio Mode] Error in filtered mode:', error);
+        console.error('[Earmode] Error in filtered mode:', error);
     }
 }
 
@@ -503,7 +503,7 @@ function checkWhitelist(videoInfo, filterRules) {
             videoChannels.some(videoChannel => videoChannel.id === ruleChannel.id)
         );
         if (match) {
-            console.log(`[Audio Mode] Channel match: ${match.name}`);
+            console.log(`[Earmode] Channel match: ${match.name}`);
             return true;
         }
     }
@@ -514,7 +514,7 @@ function checkWhitelist(videoInfo, filterRules) {
         for (const kw of whitelist.keywords) {
             const pattern = kw.keyword.toLowerCase();
             if (titleLower.includes(pattern)) {
-                console.log(`[Audio Mode] Keyword match: "${kw.keyword}"`);
+                console.log(`[Earmode] Keyword match: "${kw.keyword}"`);
                 return true;
             }
         }
@@ -588,7 +588,7 @@ function requestQualityOperation(type, debounceMs = 300) {
 
     // If same type operation already in progress, skip
     if (qualityOperationInProgress && lastQualityOperationType === type) {
-        console.log(`[Audio Mode] Quality operation '${type}' already in progress, skipping`);
+        console.log(`[Earmode] Quality operation '${type}' already in progress, skipping`);
         return;
     }
 
@@ -605,7 +605,7 @@ function requestQualityOperation(type, debounceMs = 300) {
  */
 function executeQualityOperation(type) {
     if (qualityOperationInProgress) {
-        console.log(`[Audio Mode] Quality operation in progress, queuing '${type}'`);
+        console.log(`[Earmode] Quality operation in progress, queuing '${type}'`);
         // Queue for after current operation completes
         setTimeout(() => requestQualityOperation(type, 100), 500);
         return;
@@ -653,9 +653,9 @@ function extractChannelInfo() {
         const channels = extractPageChannels();
         if (channels.length > 0) {
             const primaryChannel = channels[0];
-            console.log(`[Audio Mode] Channel found: ${primaryChannel.name} (${primaryChannel.id})`);
+            console.log(`[Earmode] Channel found: ${primaryChannel.name} (${primaryChannel.id})`);
             if (channels.length > 1) {
-                console.log('[Audio Mode] Additional channels found:', channels.slice(1));
+                console.log('[Earmode] Additional channels found:', channels.slice(1));
             }
             return {
                 channelId: primaryChannel.id,
@@ -691,7 +691,7 @@ function extractChannelInfo() {
 
         return null;
     } catch (error) {
-        console.error('[Audio Mode] Error extracting channel info:', error);
+        console.error('[Earmode] Error extracting channel info:', error);
         return null;
     }
 }
@@ -799,7 +799,7 @@ function getCurrentVideoInfo() {
             channels
         };
     } catch (error) {
-        console.error('[Audio Mode] Error extracting video info:', error);
+        console.error('[Earmode] Error extracting video info:', error);
         return null;
     }
 }
@@ -892,7 +892,7 @@ async function enableAudioMode(fromAutoRule = false) {
             savedQualityBeforeAudioMode = currentQuality;
             // Persist to storage so it survives page reloads
             chrome.storage.sync.set({ preferredQuality: currentQuality });
-            console.log('[Audio Mode] Saved quality:', savedQualityBeforeAudioMode);
+            console.log('[Earmode] Saved quality:', savedQualityBeforeAudioMode);
         }
     }
 
@@ -934,7 +934,7 @@ async function enableAudioMode(fromAutoRule = false) {
         try {
             chrome.storage.sync.set({ audioMode: true });
         } catch (error) {
-            console.log('[Audio Mode] Could not save state:', error);
+            console.log('[Earmode] Could not save state:', error);
         }
     }
 
@@ -984,7 +984,7 @@ function disableAudioMode(fromAutoRule = false) {
         try {
             chrome.storage.sync.set({ audioMode: false });
         } catch (error) {
-            console.log('[Audio Mode] Could not save state:', error);
+            console.log('[Earmode] Could not save state:', error);
         }
     }
 
@@ -1155,7 +1155,7 @@ const clickQualitySetting = (video, targetText = '144p', onComplete = null) => {
 
                                 if (wasPlaying && video.paused) {
                                     video.currentTime = currentTime;
-                                    video.play().catch(err => console.log('[Audio Mode] Could not resume:', err));
+                                    video.play().catch(err => console.log('[Earmode] Could not resume:', err));
                                 }
 
                                 // Signal completion
@@ -1175,7 +1175,7 @@ const clickQualitySetting = (video, targetText = '144p', onComplete = null) => {
             onComplete?.();
         }
     } catch (error) {
-        console.error('[Audio Mode] Error in invisible UI interaction:', error);
+        console.error('[Earmode] Error in invisible UI interaction:', error);
         closeSettingsPopup();
         resetSettingsUIStyles();
         onComplete?.();
@@ -1205,7 +1205,7 @@ const forceLowestQuality = (player, video, onComplete = null, options = {}) => {
         const restorePlaybackState = () => {
             if (wasPlaying && video.paused) {
                 video.currentTime = currentTime;
-                video.play().catch(err => console.log('[Audio Mode] Could not resume playback:', err));
+                video.play().catch(err => console.log('[Earmode] Could not resume playback:', err));
             }
         };
 
@@ -1250,7 +1250,7 @@ const forceLowestQuality = (player, video, onComplete = null, options = {}) => {
             const currentQuality = getPlayerQuality(player);
 
             if (!isAudioModeQuality(currentQuality)) {
-                console.log(`[Audio Mode] API methods failed on attempt ${attempt}, using UI interaction...`);
+                console.log(`[Earmode] API methods failed on attempt ${attempt}, using UI interaction...`);
 
                 try {
                     clickQuality(video, '144p', () => {
@@ -1264,7 +1264,7 @@ const forceLowestQuality = (player, video, onComplete = null, options = {}) => {
                             }
 
                             if (audioModeEnabled && attempt < LOWEST_QUALITY_RETRY.MAX_ATTEMPTS) {
-                                console.log(`[Audio Mode] 144p was not applied after UI interaction; retrying (${attempt + 1}/${LOWEST_QUALITY_RETRY.MAX_ATTEMPTS})`);
+                                console.log(`[Earmode] 144p was not applied after UI interaction; retrying (${attempt + 1}/${LOWEST_QUALITY_RETRY.MAX_ATTEMPTS})`);
                                 setTimeout(() => {
                                     forceLowestQuality(player, video, onComplete, {
                                         ...retryOptions,
@@ -1278,7 +1278,7 @@ const forceLowestQuality = (player, video, onComplete = null, options = {}) => {
                         }, TIMING.UI_INTERACTION_FINAL);
                     });
                 } catch (uiError) {
-                    console.error('[Audio Mode] Error in quality UI fallback:', uiError);
+                    console.error('[Earmode] Error in quality UI fallback:', uiError);
                     onComplete?.();
                 }
             } else {
@@ -1292,7 +1292,7 @@ const forceLowestQuality = (player, video, onComplete = null, options = {}) => {
         }, TIMING.API_VERIFICATION_DELAY);
 
     } catch (error) {
-        console.error('[Audio Mode] Error setting quality:', error);
+        console.error('[Earmode] Error setting quality:', error);
         onComplete?.();
     }
 };
@@ -1355,7 +1355,7 @@ const restoreQualityInternal = (onComplete = null, attempts = 3) => {
             }
             let uiTargetText = qualityToText[target] || '720p';
 
-            console.log('[Audio Mode] Restoring quality to:', target);
+            console.log('[Earmode] Restoring quality to:', target);
 
             // If saved quality is not available, fallback to auto
             if (availableLevels.length > 0 && !availableLevels.includes(target)) {
@@ -1404,7 +1404,7 @@ const restoreQualityInternal = (onComplete = null, attempts = 3) => {
             }, 500);
 
         } catch (e) {
-            console.error('[Audio Mode] Error restoring quality:', e);
+            console.error('[Earmode] Error restoring quality:', e);
             onComplete?.();
         }
     });
@@ -1701,11 +1701,11 @@ function setPlayerLook(look) {
     if (next === currentPlayerLook) return;
 
     currentPlayerLook = next;
-    console.log('[Audio Mode] Player look changed:', currentPlayerLook);
+    console.log('[Earmode] Player look changed:', currentPlayerLook);
 
     if (audioModeOverlay) {
         createAudioModeOverlay().catch(error => {
-            console.log('[Audio Mode] Could not rebuild overlay:', error);
+            console.log('[Earmode] Could not rebuild overlay:', error);
         });
     }
 }
@@ -1781,13 +1781,13 @@ async function createAudioModeOverlay() {
         try {
             chrome.storage.sync.get(['backgroundType', 'backgroundValue'], (result) => {
                 if (chrome.runtime.lastError) {
-                    console.log('[Audio Mode] Could not load theme settings:', chrome.runtime.lastError);
+                    console.log('[Earmode] Could not load theme settings:', chrome.runtime.lastError);
                     return;
                 }
                 updateOverlayTheme(result.backgroundType, result.backgroundValue);
             });
         } catch (error) {
-            console.log('[Audio Mode] Error accessing storage:', error);
+            console.log('[Earmode] Error accessing storage:', error);
         }
     }
 
@@ -1889,7 +1889,7 @@ function initNavigationObserver() {
 
             // Wait for YouTube to update DOM before applying mode logic
             navigationDebounceTimer = setTimeout(() => {
-                console.log('[Audio Mode] Navigation detected, re-applying mode logic');
+                console.log('[Earmode] Navigation detected, re-applying mode logic');
                 scheduleModeLogic('url mutation', 100);
             }, 600); // Wait 600ms for YouTube to update DOM
         }
@@ -1906,7 +1906,7 @@ initNavigationObserver();
 
 // Listen for YouTube's navigation finish event (more reliable than MutationObserver alone)
 document.addEventListener('yt-navigate-finish', () => {
-    console.log('[Audio Mode] yt-navigate-finish event fired');
+    console.log('[Earmode] yt-navigate-finish event fired');
     clearVideoCache();
     lastAppliedVideoId = null;
     resetQualityAttemptFlag(); // Allow UI fallback on new video
@@ -1948,7 +1948,7 @@ function setupVideoReadyListener() {
 
     // Listen for video source changes (new video loaded)
     video.addEventListener('loadeddata', () => {
-        console.log('[Audio Mode] Video loadeddata event');
+        console.log('[Earmode] Video loadeddata event');
         if (!isOnVideoPage()) return;
 
         // Check if video ID changed (important for playlists)
@@ -1956,7 +1956,7 @@ function setupVideoReadyListener() {
         const videoIdChanged = currentVideoId && currentVideoId !== lastAppliedVideoId;
 
         if (videoIdChanged) {
-            console.log('[Audio Mode] Video ID changed:', lastAppliedVideoId, '->', currentVideoId);
+            console.log('[Earmode] Video ID changed:', lastAppliedVideoId, '->', currentVideoId);
             resetQualityAttemptFlag(); // Allow UI fallback on new video
         }
 
@@ -1976,7 +1976,7 @@ document.addEventListener('yt-navigate-finish', () => {
 // Listen for YouTube's page data update event (fires when video metadata is ready)
 document.addEventListener('yt-page-data-updated', () => {
     if (!isOnVideoPage()) return;
-    console.log('[Audio Mode] yt-page-data-updated event fired');
+    console.log('[Earmode] yt-page-data-updated event fired');
 
     // Title and channel are reliable by now; refresh the overlay text
     updateOverlayContent();
@@ -1987,7 +1987,7 @@ document.addEventListener('yt-page-data-updated', () => {
 
     if (videoIdChanged && currentModeType === 'filtered') {
         // In filtered mode, always re-check when video changes
-        console.log('[Audio Mode] Video changed in playlist, re-checking filters');
+        console.log('[Earmode] Video changed in playlist, re-checking filters');
         scheduleModeLogic('page data video change', 200);
     } else if (currentModeType === 'filtered' && !audioModeEnabled) {
         // Not enabled yet, check filters
@@ -2007,7 +2007,7 @@ function startPlaylistCheck() {
 
         const currentVideoId = new URLSearchParams(window.location.search).get('v');
         if (currentVideoId && currentVideoId !== lastCheckedVideoId) {
-            console.log('[Audio Mode] Playlist check detected video change:', lastCheckedVideoId, '->', currentVideoId);
+            console.log('[Earmode] Playlist check detected video change:', lastCheckedVideoId, '->', currentVideoId);
             lastCheckedVideoId = currentVideoId;
 
             // If video ID differs from last applied, re-apply mode logic

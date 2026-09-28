@@ -1,10 +1,14 @@
 {
   "appName": {
-    "message": "YouTube Audio Mode",
+    "message": "Earmode: Audio Only for YouTube",
     "description": "Extension name"
   },
+  "appShortName": {
+    "message": "Earmode",
+    "description": "Short extension name"
+  },
   "extDescription": {
-    "message": "Play YouTube videos in audio-only mode to save bandwidth and reduce internet usage",
+    "message": "Listen to YouTube with the video turned off. Pick channels that always play as audio and save mobile data.",
     "description": "Extension description shown in Chrome Web Store"
   },
   "thisMonth": {

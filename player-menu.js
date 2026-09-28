@@ -190,10 +190,10 @@ function setPlayerMenuOpen(open, returnFocus) {
 function savePlayerMenuSetting(items) {
     try {
         chrome.storage.sync.set(items)?.catch?.(error => {
-            console.log('[Audio Mode] Could not save setting from player menu:', error);
+            console.log('[Earmode] Could not save setting from player menu:', error);
         });
     } catch (error) {
-        console.log('[Audio Mode] Could not save setting from player menu:', error);
+        console.log('[Earmode] Could not save setting from player menu:', error);
     }
 }
 

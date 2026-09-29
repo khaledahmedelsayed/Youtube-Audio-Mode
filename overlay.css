@@ -46,7 +46,8 @@
 
 #youtube-audio-mode-overlay {
   --em-bg: #172554;
-  --em-sun: #f2c14e;
+  /* Accent from the accentColor setting (content.js sets --em-accent inline) */
+  --em-sun: var(--em-accent, #f2c14e);
   position: absolute !important;
   top: 0 !important;
   left: 0 !important;
@@ -231,6 +232,10 @@
   margin-top: -45px;
   z-index: 1;
   animation: em-drift 6s linear infinite;
+}
+
+#youtube-audio-mode-overlay .em-waves path {
+  stroke: var(--em-sun);
 }
 
 #youtube-audio-mode-overlay.paused .em-waves {

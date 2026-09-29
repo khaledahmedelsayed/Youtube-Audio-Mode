@@ -220,3 +220,46 @@ test('background change in storage updates the overlay theme', async () => {
     assert.equal(overlay.style.props['--em-bg'], 'url("https://example.com/b.png")');
     assert.equal(overlay.classList.contains('has-image'), true);
 });
+
+// ---------- accent color ----------
+
+const accentChange = (api, value) => api.context.chrome.storage.onChanged.listeners
+    .forEach(fn => fn({ accentColor: { oldValue: undefined, newValue: value } }, 'sync'));
+
+test('overlay gets the stored accent as --em-accent variables', async () => {
+    const api = loadContentScript(createTimers(), { syncStorage: { accentColor: 'mint' } });
+    setupOverlayDom(api);
+    await api.createAudioModeOverlay();
+
+    const mint = api.context.Earmode.accentVars('mint');
+    const props = api.getOverlayForTest().style.props;
+    assert.equal(props['--em-accent'], mint['--em-accent']);
+    assert.equal(props['--em-accent-ink'], mint['--em-accent-ink']);
+});
+
+test('overlay falls back to sunflower when no accent is stored', async () => {
+    const api = loadContentScript(createTimers());
+    setupOverlayDom(api);
+    await api.createAudioModeOverlay();
+    assert.equal(api.getOverlayForTest().style.props['--em-accent'], '#F2C14E');
+});
+
+test('changing accentColor recolors the shown overlay live', async () => {
+    const api = loadContentScript(createTimers());
+    setupOverlayDom(api);
+    await api.createAudioModeOverlay();
+
+    accentChange(api, 'rose');
+    assert.equal(api.getOverlayForTest().style.props['--em-accent'], api.context.Earmode.accentVars('rose')['--em-accent']);
+    accentChange(api, 'not-a-preset');
+    assert.equal(api.getOverlayForTest().style.props['--em-accent'], '#F2C14E');
+});
+
+test('waves graphic takes its stroke from CSS, not a fixed color', async () => {
+    const api = loadContentScript(createTimers());
+    setupOverlayDom(api);
+    api.setPlayerLook('waves');
+    await api.createAudioModeOverlay();
+    const waves = api.getOverlayForTest().querySelector('.em-waves');
+    waves.children.forEach(path => assert.equal(path.getAttribute('stroke'), null));
+});

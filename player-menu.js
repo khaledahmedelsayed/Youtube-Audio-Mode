@@ -1,7 +1,7 @@
 // Earmode - in-player button and menu
 // Runs after content.js in the same isolated world and uses its globals:
 // getEarmodeStatus, setVideoAudio, clearOverride, isOnVideoPage, t, currentLanguage,
-// currentPlayerLook, normalizePlayerLook, SVG_NS.
+// currentPlayerLook, currentAccent, normalizePlayerLook, SVG_NS, and Earmode from shared.js.
 
 const PLAYER_MENU_ID = 'em-player-menu';
 const PLAYER_MENU_RETRY_MS = 500;
@@ -314,6 +314,8 @@ function renderPlayerMenu() {
     const model = menuModel(status, currentPlayerLook, t);
     const dir = currentLanguage === 'ar' ? 'rtl' : 'ltr';
 
+    Earmode.applyAccent(els.button, currentAccent);
+    Earmode.applyAccent(els.menu, currentAccent);
     els.button.setAttribute('dir', dir);
     els.button.dataset.on = String(model.on);
     els.button.setAttribute('aria-expanded', String(playerMenuOpen));

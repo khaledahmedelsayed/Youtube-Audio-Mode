@@ -65,6 +65,25 @@ const PLAYER_LOOKS = ['card', 'blur', 'minimal', 'waves'];
 const SVG_NS = 'http://www.w3.org/2000/svg';
 let currentPlayerLook = 'card';
 
+// Accent color (accentColor sync setting); shared.js runs first and provides Earmode
+let currentAccent = Earmode.DEFAULT_ACCENT;
+
+/**
+ * Use an accent on the overlay and the in-player button and menu
+ * @param {*} id - Stored accent id (unknown values give the default)
+ */
+function setAccent(id) {
+    currentAccent = Earmode.normalizeAccent(id);
+    Earmode.applyAccent(audioModeOverlay, currentAccent);
+    if (typeof renderPlayerMenu === 'function') renderPlayerMenu();
+}
+
+try {
+    chrome.storage.sync.get(['accentColor'], result => setAccent(result?.accentColor));
+} catch (error) {
+    console.log('[Earmode] Could not read accentColor:', error);
+}
+
 /**
  * Return a supported player look, falling back to 'card' for unknown values
  * @param {*} value - Stored or requested look
@@ -868,6 +887,10 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
             setPlayerLook(changes.playerLook.newValue);
         }
 
+        if (changes.accentColor) {
+            setAccent(changes.accentColor.newValue);
+        }
+
         if (changes.language) {
             // Same as the updateLanguage message, for tabs the sender did not reach
             currentLanguage = changes.language.newValue
@@ -1586,11 +1609,12 @@ function createWavesGraphic() {
         preserveAspectRatio: 'none',
         'aria-hidden': 'true'
     });
+    // Stroke color comes from overlay.css (the accent)
     svg.appendChild(createSvgElement('path', {
-        d, fill: 'none', stroke: '#F2C14E', 'stroke-width': 3, opacity: 0.9
+        d, fill: 'none', 'stroke-width': 3, opacity: 0.9
     }));
     svg.appendChild(createSvgElement('path', {
-        d, fill: 'none', stroke: '#F2C14E', 'stroke-width': 2, opacity: 0.35, transform: 'translate(25 6)'
+        d, fill: 'none', 'stroke-width': 2, opacity: 0.35, transform: 'translate(25 6)'
     }));
     return svg;
 }
@@ -1770,6 +1794,7 @@ async function createAudioModeOverlay() {
     audioModeOverlay = document.createElement('div');
     audioModeOverlay.id = 'youtube-audio-mode-overlay';
     audioModeOverlay.className = `earmode-look-${look}`;
+    Earmode.applyAccent(audioModeOverlay, currentAccent);
     for (const child of buildOverlayLook(look)) {
         audioModeOverlay.appendChild(child);
     }

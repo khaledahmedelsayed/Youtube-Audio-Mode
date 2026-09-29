@@ -156,6 +156,8 @@ function loadContentScript(timers, { extraScripts = [], syncStorage = {}, syncGe
     };
 
     vm.createContext(context);
+    // shared.js runs first, as in the manifest's content_scripts.js
+    vm.runInContext(fs.readFileSync(path.join(root, 'shared.js'), 'utf8'), context, { filename: 'shared.js' });
     vm.runInContext(`${source}
 globalThis.__audioModeTestApi = {
     forceLowestQuality,

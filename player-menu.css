@@ -4,8 +4,9 @@
 
 .em-player-btn,
 .em-player-menu {
-    --em-pm-sun: #F2C14E;
-    --em-pm-sun-ink: #3A2C05;
+    /* Accent from the accentColor setting (player-menu.js sets --em-accent inline) */
+    --em-pm-sun: var(--em-accent, #F2C14E);
+    --em-pm-sun-ink: var(--em-accent-ink, #1C1B22);
     --em-pm-surface: #3A3946;
     --em-pm-surface-2: #2A2933;
     --em-pm-ink: #EDECF3;

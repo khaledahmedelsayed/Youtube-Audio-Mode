@@ -502,3 +502,23 @@ test('nothing mounts until the showPlayerButton read resolves', () => {
     assert.equal(player.querySelectorAll('.em-player-btn').length, 1);
     assert.equal(player.querySelectorAll('.em-player-menu').length, 1);
 });
+
+test('button and menu get the stored accent variables', () => {
+    const { ctx, player } = setupMenu({ syncStorage: { accentColor: 'sky' } });
+    ctx.ensurePlayerMenu();
+    const sky = ctx.Earmode.accentVars('sky');
+    assert.equal(buttonOf(player).style.props['--em-accent'], sky['--em-accent']);
+    assert.equal(menuOf(player).style.props['--em-accent'], sky['--em-accent']);
+    assert.equal(menuOf(player).style.props['--em-accent-ink'], sky['--em-accent-ink']);
+});
+
+test('changing accentColor recolors the button and menu live', () => {
+    const { ctx, player } = setupMenu();
+    ctx.ensurePlayerMenu();
+    assert.equal(buttonOf(player).style.props['--em-accent'], '#F2C14E');
+
+    ctx.chrome.storage.onChanged.listeners.forEach(fn => fn({ accentColor: { newValue: 'lilac' } }, 'sync'));
+    const lilac = ctx.Earmode.accentVars('lilac')['--em-accent'];
+    assert.equal(buttonOf(player).style.props['--em-accent'], lilac);
+    assert.equal(menuOf(player).style.props['--em-accent'], lilac);
+});

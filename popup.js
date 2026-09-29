@@ -40,6 +40,7 @@ const els = {
     gearBtn: $('gear-btn'),
     switchBox: $('switch'),
     switchButtons: [$('switch-video'), $('switch-audio')],
+    state: $('state'),
     statePill: $('state-pill'),
     stateText: $('state-text'),
     backToAuto: $('back-to-auto'),
@@ -196,8 +197,11 @@ function renderState() {
     const showMessage = key => {
         els.statePill.hidden = true;
         els.backToAuto.hidden = true;
+        els.state.classList.toggle('notice', !!key);
         setText(els.stateText, key ? t(key) : '');
     };
+
+    els.state.classList.remove('notice');
 
     if (!state.onWatch) return showMessage('noVideoSwitch');
     if (state.contentMissing) return showMessage('reloadTab');

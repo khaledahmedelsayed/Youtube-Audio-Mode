@@ -237,6 +237,19 @@ body[dir="rtl"] .switch button b {
     min-height: 20px;
 }
 
+/* No video / reload tab: a readable message instead of the quiet state line */
+.state.notice {
+    margin-top: 0;
+    justify-content: center;
+    text-align: center;
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: var(--surface-2);
+    color: var(--ink);
+    font-size: 13px;
+    font-weight: 600;
+}
+
 .state .pill {
     font-weight: 700;
     color: var(--ink);

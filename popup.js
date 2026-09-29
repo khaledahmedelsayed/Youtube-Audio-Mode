@@ -52,7 +52,6 @@ const els = {
     lookButtons: [...document.querySelectorAll('#looks .look')],
     stats: $('stats'),
     statsText: $('stats-text'),
-    statsGo: $('stats-go'),
     toast: $('toast')
 };
 
@@ -156,7 +155,6 @@ async function applyLanguage(lang) {
     els.langBtn.setAttribute('aria-label', t('languageLabel'));
     els.gearBtn.title = t('settingsLabel');
     els.gearBtn.setAttribute('aria-label', t('settingsLabel'));
-    els.statsGo.textContent = isArabic ? '‹' : '›';
 }
 
 // ---------- rendering ----------
@@ -249,11 +247,7 @@ function renderLooks() {
 
 function renderStats() {
     const amount = formatSavedAmount(savedMegabytes(sumMonthSeconds(state.statsLogs)), t);
-    const [before, after = ''] = t('savedThisMonth').split('{amount}');
-    const num = document.createElement('span');
-    num.className = 'num';
-    num.textContent = amount;
-    els.statsText.replaceChildren(before, num, after);
+    els.statsText.textContent = t('savedThisMonth').replace('{amount}', amount);
 }
 
 function render() {

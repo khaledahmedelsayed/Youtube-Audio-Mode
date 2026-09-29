@@ -272,8 +272,12 @@
     "description": "Player look name"
   },
   "savedThisMonth": {
-    "message": "Saved {amount} this month",
-    "description": "Stats line. {amount} is like 2.3 GB"
+    "message": "{amount} saved this month",
+    "description": "Stats footer. {amount} is like 2.3 GB"
+  },
+  "statsLink": {
+    "message": "Stats",
+    "description": "Popup footer link that opens the stats page"
   },
   "noVideoSwitch": {
     "message": "Open a YouTube video to use the switch.",

@@ -273,7 +273,11 @@
     },
     "savedThisMonth": {
         "message": "وفّرت {amount} هذا الشهر",
-        "description": "Stats line. {amount} is like 2.3 GB"
+        "description": "Stats footer. {amount} is like 2.3 GB"
+    },
+    "statsLink": {
+        "message": "الإحصاءات",
+        "description": "Popup footer link that opens the stats page"
     },
     "noVideoSwitch": {
         "message": "افتح فيديو على يوتيوب لاستخدام المفتاح.",

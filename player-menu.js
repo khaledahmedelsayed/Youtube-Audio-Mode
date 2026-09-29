@@ -118,11 +118,12 @@ function playerMenuIcon(name) {
 }
 
 /**
- * Keep an event away from YouTube's player; Escape also closes the menu.
+ * Keep an event away from YouTube's player; a user's Escape also closes the menu.
+ * Synthetic Escapes (closeSettingsPopup dispatches them on the focused element) do not.
  * @param {Event} event
  */
 function playerMenuShield(event) {
-    if (event.type === 'keydown' && event.key === 'Escape' && playerMenuOpen) {
+    if (event.type === 'keydown' && event.key === 'Escape' && playerMenuOpen && event.isTrusted) {
         event.preventDefault();
         setPlayerMenuOpen(false, true);
     }
@@ -130,11 +131,12 @@ function playerMenuShield(event) {
 }
 
 /**
- * Close the menu on clicks outside the button and menu (document capture listener)
+ * Close the menu on clicks outside the button and menu (document capture listener).
+ * Ignores synthetic clicks, like the quality fallback clicking the settings gear.
  * @param {Event} event
  */
 function playerMenuOutsideClick(event) {
-    if (!playerMenuEls) return;
+    if (!playerMenuEls || !event.isTrusted) return;
     const { button, menu, player } = playerMenuEls;
     if (button.contains(event.target) || menu.contains(event.target)) return;
     // A click on the video only dismisses the menu; it must not also toggle play
@@ -155,11 +157,12 @@ function playerMenuHasFocus() {
 }
 
 /**
- * Close on Escape; focus returns to the button only if it was on the button or in the menu
+ * Close on a user's Escape; focus returns to the button only if it was on the button or in the menu.
+ * Ignores the synthetic Escapes closeSettingsPopup dispatches.
  * @param {KeyboardEvent} event
  */
 function playerMenuDocumentKeydown(event) {
-    if (event.key !== 'Escape' || !playerMenuOpen) return;
+    if (!event.isTrusted || event.key !== 'Escape' || !playerMenuOpen) return;
     // This Escape only closes the menu; YouTube should not also act on it
     event.preventDefault();
     event.stopPropagation();

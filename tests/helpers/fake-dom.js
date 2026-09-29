@@ -64,12 +64,14 @@ class FakeElement {
     }
     /**
      * Call this element's listeners for `type`, then bubble to its parents until stopped.
+     * Events count as user input (isTrusted true) unless `extra` says otherwise.
      * @returns {object} The event object passed to listeners
      */
     dispatch(type, extra = {}) {
         const event = {
             type,
             target: this,
+            isTrusted: true,
             stopped: false,
             defaultPrevented: false,
             stopPropagation() {

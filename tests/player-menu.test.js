@@ -186,10 +186,10 @@ test('Escape and outside clicks close the menu', () => {
     assert.equal(FakeElement.focused, button);
 
     button.dispatch('click');
-    const inside = { target: menu.querySelector('.em-pm-look') };
+    const inside = { target: menu.querySelector('.em-pm-look'), isTrusted: true };
     docListeners.click.forEach(entry => entry.fn(inside));
     assert.equal(menu.hidden, false);
-    docListeners.click.forEach(entry => entry.fn({ target: new FakeElement('div') }));
+    docListeners.click.forEach(entry => entry.fn({ target: new FakeElement('div'), isTrusted: true }));
     assert.equal(menu.hidden, true);
 });
 
@@ -246,9 +246,10 @@ test('direction follows the language and the menu leaves non-video pages', () =>
 
 /**
  * An Escape keydown that records stopPropagation and preventDefault
+ * @param {boolean} [isTrusted] - False for events the extension dispatches itself
  */
-function escapeEvent() {
-    const event = { key: 'Escape', stopped: false, prevented: false };
+function escapeEvent(isTrusted = true) {
+    const event = { key: 'Escape', isTrusted, stopped: false, prevented: false };
     event.stopPropagation = () => { event.stopped = true; };
     event.preventDefault = () => { event.prevented = true; };
     return event;
@@ -272,10 +273,13 @@ test('Escape from outside the menu closes it without moving focus', () => {
 
 /**
  * A click event object as the document capture listener sees it
+ * @param {object} target
+ * @param {boolean} [isTrusted] - False for clicks the extension makes itself
  */
-function clickEvent(target) {
+function clickEvent(target, isTrusted = true) {
     return {
         target,
+        isTrusted,
         stopped: false,
         defaultPrevented: false,
         stopPropagation() {
@@ -401,4 +405,42 @@ test('document Escape that closes the menu does not reach YouTube', () => {
     assert.equal(menuOf(player).hidden, true);
     assert.equal(closing.stopped, true);
     assert.equal(closing.prevented, true);
+});
+
+test('synthetic clicks and Escapes from the quality fallback leave the menu open', () => {
+    const { ctx, player, doc, docListeners } = setupMenu();
+    ctx.ensurePlayerMenu();
+    const gear = player.appendChild(new FakeElement('button'));
+    buttonOf(player).dispatch('click');
+
+    // The quality fallback clicks the settings gear programmatically
+    const syntheticClick = clickEvent(gear, false);
+    docListeners.click.forEach(entry => entry.fn(syntheticClick));
+    assert.equal(menuOf(player).hidden, false);
+    assert.equal(syntheticClick.stopped, false);
+    assert.equal(syntheticClick.defaultPrevented, false);
+
+    // closeSettingsPopup dispatches Escape on document, activeElement, body and window
+    doc.activeElement = new FakeElement('input');
+    const syntheticEscape = escapeEvent(false);
+    docListeners.keydown.forEach(entry => entry.fn(syntheticEscape));
+    assert.equal(menuOf(player).hidden, false);
+    assert.equal(syntheticEscape.stopped, false);
+    assert.equal(syntheticEscape.prevented, false);
+
+    // A synthetic Escape on a focused menu button does not close it either
+    const look = menuOf(player).querySelector('.em-pm-look');
+    const onButton = look.dispatch('keydown', { key: 'Escape', isTrusted: false });
+    assert.equal(menuOf(player).hidden, false);
+    assert.equal(onButton.stopped, true); // still kept away from YouTube
+
+    // Real user input still closes it
+    const trustedClick = clickEvent(gear);
+    docListeners.click.forEach(entry => entry.fn(trustedClick));
+    assert.equal(menuOf(player).hidden, true);
+    assert.equal(trustedClick.stopped, true);
+
+    buttonOf(player).dispatch('click');
+    docListeners.keydown.forEach(entry => entry.fn(escapeEvent()));
+    assert.equal(menuOf(player).hidden, true);
 });

@@ -31,12 +31,14 @@ function createTimers() {
 /**
  * Run content.js in a fresh vm context and return its test API.
  * @param {object} timers - From createTimers()
- * @param {{ extraScripts?: string[], syncStorage?: object }} [options] - `extraScripts`: files
- *     (relative to the repo root) run after content.js in the same context, like later entries of
- *     the manifest's content_scripts.js. `syncStorage`: values chrome.storage.sync.get returns.
+ * @param {{ extraScripts?: string[], syncStorage?: object, syncGet?: function }} [options] -
+ *     `extraScripts`: files (relative to the repo root) run after content.js in the same context,
+ *     like later entries of the manifest's content_scripts.js. `syncStorage`: values
+ *     chrome.storage.sync.get returns. `syncGet(keys, callback)`: replaces sync.get entirely.
+ *     The load-time document records listeners in `document.listeners`.
  * @returns {object} Test API; `api.context` is the vm global for reaching extra scripts' functions
  */
-function loadContentScript(timers, { extraScripts = [], syncStorage = {} } = {}) {
+function loadContentScript(timers, { extraScripts = [], syncStorage = {}, syncGet = null } = {}) {
     const root = path.join(__dirname, '..', '..');
     const source = fs.readFileSync(path.join(root, 'content.js'), 'utf8');
     const location = {
@@ -91,7 +93,10 @@ function loadContentScript(timers, { extraScripts = [], syncStorage = {} } = {})
             querySelectorAll() {
                 return [];
             },
-            addEventListener() {},
+            listeners: {},
+            addEventListener(type, fn) {
+                (this.listeners[type] ||= []).push(fn);
+            },
             dispatchEvent() {}
         },
         chrome: {
@@ -111,7 +116,8 @@ function loadContentScript(timers, { extraScripts = [], syncStorage = {} } = {})
             },
             storage: {
                 sync: {
-                    get(_keys, callback) {
+                    get(keys, callback) {
+                        if (syncGet) return syncGet(keys, callback);
                         callback({ ...syncStorage });
                     },
                     set() {}

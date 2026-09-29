@@ -357,13 +357,29 @@ function removePlayerMenu() {
 }
 
 /**
+ * Remove every .em-player-btn / .em-player-menu from a player element
+ * @param {Element|null} player
+ */
+function sweepPlayerMenuCopies(player) {
+    if (!player) return;
+    ['.em-player-btn', '.em-player-menu'].forEach(selector => {
+        player.querySelectorAll(selector).forEach(el => el.remove());
+    });
+}
+
+/**
  * Attach the button and menu to the player once, then render them.
- * Removes them when the page is not a video page.
+ * Removes them when the page is not a video page or the button is turned off.
  * @returns {boolean} True when the menu is mounted
  */
 function ensurePlayerMenu() {
     if (!isOnVideoPage() || playerButtonEnabled !== true) {
         removePlayerMenu();
+        if (playerButtonEnabled === false) {
+            // Turned off: also drop copies left behind (e.g. by an earlier load of the extension)
+            sweepPlayerMenuCopies(document.querySelector('#movie_player'));
+            sweepPlayerMenuCopies(document.querySelector('#player-container'));
+        }
         return false;
     }
 
@@ -375,9 +391,7 @@ function ensurePlayerMenu() {
     if (!existing || !playerMenuEls || existing !== playerMenuEls.button) {
         // Stale copies (e.g. a replaced player or an earlier fallback container)
         removePlayerMenu();
-        ['.em-player-btn', '.em-player-menu'].forEach(selector => {
-            player.querySelectorAll(selector).forEach(el => el.remove());
-        });
+        sweepPlayerMenuCopies(player);
         playerMenuEls = buildPlayerMenu();
         playerMenuEls.player = player;
         playerMenuEls.onFallback = !moviePlayer;

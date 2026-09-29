@@ -178,13 +178,26 @@
   background: linear-gradient(rgba(0, 0, 0, 0.55), transparent 60%);
 }
 
-/* Blur and waves keep their text at the top, clear of YouTube's progress bar and controls */
+/* Blur and waves keep their text at the top, clear of YouTube's progress bar and controls,
+   and below the Earmode player button (which ends about 40px down) */
 #youtube-audio-mode-overlay.earmode-look-blur .em-ov-text {
   position: absolute;
   inset-inline: 24px;
-  top: 24px;
+  top: 56px;
   display: grid;
   gap: 2px;
+}
+
+/* Fullscreen and embeds add YouTube's top bar and push the button down */
+#movie_player.ytp-fullscreen #youtube-audio-mode-overlay .em-ov-text,
+#movie_player.ytp-embed #youtube-audio-mode-overlay .em-ov-text {
+  top: 96px;
+}
+
+/* Two title lines keep the text clear of the waves line on small players */
+#youtube-audio-mode-overlay.earmode-look-blur .em-title,
+#youtube-audio-mode-overlay.earmode-look-waves .em-title {
+  -webkit-line-clamp: 2;
 }
 
 /* ---------- minimal ---------- */
@@ -228,7 +241,7 @@
   position: absolute;
   z-index: 2;
   inset-inline: 24px;
-  top: 24px;
+  top: 56px;
   display: grid;
   gap: 2px;
 }

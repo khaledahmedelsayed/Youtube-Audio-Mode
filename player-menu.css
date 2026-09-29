@@ -106,9 +106,10 @@
     cursor: default;
 }
 
-/* Arabic: anchor to the left edge */
-.em-player-btn[dir="rtl"],
-.em-player-menu[dir="rtl"] {
+/* YouTube itself in a right-to-left language: anchor to the left edge.
+   Keyed off YouTube's page direction, not the extension language (which only sets text direction). */
+html[dir="rtl"] .em-player-btn,
+html[dir="rtl"] .em-player-menu {
     left: 12px;
     right: auto;
 }

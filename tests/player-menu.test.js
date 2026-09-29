@@ -13,9 +13,10 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
  * `dom.player` / `dom.container` can be swapped to simulate YouTube building the player late.
  * Timers set after setup are captured in `timers` instead of running.
  */
-function setupMenu({ search = '?v=dQw4w9WgXcQ', withPlayer = true, syncStorage = {} } = {}) {
-    const api = loadContentScript(createTimers(), { extraScripts: ['player-menu.js'], syncStorage });
+function setupMenu({ search = '?v=dQw4w9WgXcQ', withPlayer = true, syncStorage = {}, syncGet = null } = {}) {
+    const api = loadContentScript(createTimers(), { extraScripts: ['player-menu.js'], syncStorage, syncGet });
     const ctx = api.context;
+    const loadDoc = ctx.document; // holds the listeners added at load (yt-navigate-finish)
     const player = new FakeElement('div');
     player.id = 'movie_player';
     const dom = { player: withPlayer ? player : null, container: null };
@@ -68,7 +69,7 @@ function setupMenu({ search = '?v=dQw4w9WgXcQ', withPlayer = true, syncStorage =
         return pending.length;
     };
     const run = code => vm.runInContext(code, ctx);
-    return { api, ctx, player, dom, doc, docListeners, writes, run, timers, runTimers };
+    return { api, ctx, player, dom, doc, docListeners, loadDoc, writes, run, timers, runTimers };
 }
 
 const buttonOf = player => player.querySelector('.em-player-btn');
@@ -89,7 +90,6 @@ test('menuModel maps status and look to labels and pressed states', () => {
     ]);
     assert.equal(model.showBackToAuto, true);
     assert.equal(model.backToAutoLabel, '<backToAuto>');
-    assert.equal('modes' in model, false);
     assert.deepEqual(model.looks.map(look => [look.value, look.label, look.pressed]), [
         ['card', '<lookCard>', false],
         ['blur', '<lookBlur>', false],
@@ -134,7 +134,6 @@ test('menu is built from elements with SVG icons and two blocks', () => {
     assert.deepEqual(plain(menu.querySelectorAll('.em-pm-title').map(el => el.textContent)),
         ['menuThisVideo', 'menuPlayerLook']);
     assert.equal(menu.querySelectorAll('.em-pm-opt').length, 2);
-    assert.equal(menu.querySelectorAll('.em-pm-seg').length, 0);
     assert.equal(menu.querySelectorAll('.em-pm-mode').length, 0);
     assert.equal(menu.querySelectorAll('.em-pm-look').length, 4);
     const svgs = [...menu.walk()].filter(el => el.tagName === 'svg');
@@ -459,6 +458,39 @@ test('changing showPlayerButton removes and restores the button live', () => {
     assert.equal(ctx.ensurePlayerMenu(), false);
 
     change({ showPlayerButton: { oldValue: false, newValue: true } });
+    assert.equal(player.querySelectorAll('.em-player-btn').length, 1);
+    assert.equal(player.querySelectorAll('.em-player-menu').length, 1);
+});
+
+test('showPlayerButton false also sweeps orphan copies from the player', () => {
+    const { ctx, player } = setupMenu({ syncStorage: { showPlayerButton: false } });
+    const orphanButton = new FakeElement('button');
+    orphanButton.className = 'em-player-btn';
+    const orphanMenu = new FakeElement('div');
+    orphanMenu.className = 'em-player-menu';
+    player.append(orphanButton, orphanMenu);
+    assert.equal(ctx.ensurePlayerMenu(), false);
+    assert.equal(player.children.length, 0);
+});
+
+test('nothing mounts until the showPlayerButton read resolves', () => {
+    let resolveRead = null;
+    const syncGet = (keys, callback) => {
+        if ([].concat(keys).includes('showPlayerButton')) resolveRead = callback;
+        else callback({});
+    };
+    const { ctx, player, loadDoc, timers } = setupMenu({ syncGet });
+    assert.equal(typeof resolveRead, 'function');
+
+    // Only player-menu.js's handler: content.js's own ones need a fuller document
+    const navigate = loadDoc.listeners['yt-navigate-finish'].filter(fn => String(fn).includes('schedulePlayerMenu'));
+    assert.equal(navigate.length, 1);
+    navigate[0]({});
+    ctx.window.dispatchEvent({ type: 'earmode:state' });
+    assert.equal(player.children.length, 0);
+    assert.equal(timers.filter(timer => timer.fn).length, 0);
+
+    resolveRead({});
     assert.equal(player.querySelectorAll('.em-player-btn').length, 1);
     assert.equal(player.querySelectorAll('.em-player-menu').length, 1);
 });

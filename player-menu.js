@@ -7,12 +7,6 @@ const PLAYER_MENU_ID = 'em-player-menu';
 const PLAYER_MENU_RETRY_MS = 500;
 const PLAYER_MENU_MAX_RETRIES = 20;
 
-const PLAYER_MENU_MODES = [
-    { value: 'always', key: 'modeEverything' },
-    { value: 'filtered', key: 'modeMyList' },
-    { value: 'off', key: 'modeNothing' }
-];
-
 const PLAYER_MENU_LOOKS = [
     { value: 'card', key: 'lookCard' },
     { value: 'blur', key: 'lookBlur' },
@@ -49,14 +43,12 @@ let playerButtonEnabled = null;
 /**
  * Labels and pressed states for the in-player button and menu
  * @param {{ audio: boolean, reason: string }} status - From getEarmodeStatus()
- * @param {string} mode - 'always' | 'filtered' | 'off' (unknown values count as 'always')
  * @param {string} look - One of PLAYER_LOOKS (unknown values count as 'card')
  * @param {function(string): string} translate - Message lookup
  * @returns {object} Render model
  */
-function menuModel(status, mode, look, translate) {
+function menuModel(status, look, translate) {
     const on = status?.audio === true;
-    const activeMode = PLAYER_MENU_MODES.some(item => item.value === mode) ? mode : 'always';
     const activeLook = PLAYER_MENU_LOOKS.some(item => item.value === look) ? look : 'card';
 
     return {
@@ -64,7 +56,6 @@ function menuModel(status, mode, look, translate) {
         buttonText: `Earmode · ${translate(on ? 'nowAudio' : 'nowVideo')}`,
         titles: {
             thisVideo: translate('menuThisVideo'),
-            autoListen: translate('menuAutoListen'),
             playerLook: translate('menuPlayerLook')
         },
         switchLabel: translate('switchLabel'),
@@ -74,11 +65,6 @@ function menuModel(status, mode, look, translate) {
         ],
         showBackToAuto: status?.reason === 'manual',
         backToAutoLabel: translate('backToAuto'),
-        modes: PLAYER_MENU_MODES.map(item => ({
-            value: item.value,
-            label: translate(item.key),
-            pressed: item.value === activeMode
-        })),
         looks: PLAYER_MENU_LOOKS.map(item => ({
             value: item.value,
             label: translate(item.key),
@@ -218,14 +204,6 @@ function onPlayerMenuSwitch(audio) {
 }
 
 /**
- * @param {string} mode
- */
-function onPlayerMenuMode(mode) {
-    if (mode === getEarmodeStatus().mode) return;
-    savePlayerMenuSetting({ audioModeType: mode });
-}
-
-/**
  * @param {string} look
  */
 function onPlayerMenuLook(look) {
@@ -295,17 +273,6 @@ function buildPlayerMenu() {
     backToAuto.addEventListener('click', () => clearOverride());
     thisVideo.block.appendChild(backToAuto);
 
-    // Auto-listen: Everything | My list | Nothing
-    const seg = playerMenuEl('div', 'em-pm-seg');
-    const modeButtons = PLAYER_MENU_MODES.map(({ value }) => {
-        const modeButton = playerMenuEl('button', 'em-pm-mode');
-        modeButton.setAttribute('type', 'button');
-        modeButton.addEventListener('click', () => onPlayerMenuMode(value));
-        seg.appendChild(modeButton);
-        return modeButton;
-    });
-    const autoListen = buildPlayerMenuBlock('em-pm-title-auto', seg);
-
     // Player look tiles
     const looks = playerMenuEl('div', 'em-pm-looks');
     const lookButtons = PLAYER_MENU_LOOKS.map(({ value }) => {
@@ -323,7 +290,6 @@ function buildPlayerMenu() {
     const playerLook = buildPlayerMenuBlock('em-pm-title-look', looks);
 
     menu.appendChild(thisVideo.block);
-    menu.appendChild(autoListen.block);
     menu.appendChild(playerLook.block);
 
     PLAYER_MENU_BLOCKED_EVENTS.forEach(type => {
@@ -334,8 +300,8 @@ function buildPlayerMenu() {
     });
 
     return {
-        button, label, menu, switchBox, switchButtons, backToAuto, modeButtons, lookButtons,
-        titles: { thisVideo: thisVideo.title, autoListen: autoListen.title, playerLook: playerLook.title }
+        button, label, menu, switchBox, switchButtons, backToAuto, lookButtons,
+        titles: { thisVideo: thisVideo.title, playerLook: playerLook.title }
     };
 }
 
@@ -347,7 +313,7 @@ function renderPlayerMenu() {
     if (!els) return;
 
     const status = getEarmodeStatus();
-    const model = menuModel(status, status.mode, currentPlayerLook, t);
+    const model = menuModel(status, currentPlayerLook, t);
     const dir = currentLanguage === 'ar' ? 'rtl' : 'ltr';
 
     els.button.setAttribute('dir', dir);
@@ -360,7 +326,6 @@ function renderPlayerMenu() {
     els.menu.hidden = !playerMenuOpen;
 
     els.titles.thisVideo.textContent = model.titles.thisVideo;
-    els.titles.autoListen.textContent = model.titles.autoListen;
     els.titles.playerLook.textContent = model.titles.playerLook;
 
     els.switchBox.dataset.on = String(model.on);
@@ -373,10 +338,6 @@ function renderPlayerMenu() {
     els.backToAuto.hidden = !model.showBackToAuto;
     els.backToAuto.textContent = model.backToAutoLabel;
 
-    model.modes.forEach((item, index) => {
-        els.modeButtons[index].textContent = item.label;
-        els.modeButtons[index].setAttribute('aria-pressed', String(item.pressed));
-    });
     model.looks.forEach((item, index) => {
         const { lookButton, text } = els.lookButtons[index];
         text.textContent = item.label;
@@ -461,7 +422,7 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
     if (namespace !== 'sync') return;
     if (changes.showPlayerButton) {
         setPlayerButtonEnabled(changes.showPlayerButton.newValue);
-    } else if (changes.audioModeType || changes.playerLook) {
+    } else if (changes.playerLook) {
         renderPlayerMenu();
     }
 });

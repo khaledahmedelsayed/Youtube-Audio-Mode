@@ -225,32 +225,6 @@
     cursor: pointer;
 }
 
-/* Auto-listen: segmented control */
-.em-pm-seg {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    background: var(--em-pm-surface-2);
-    border-radius: 12px;
-    padding: 3px;
-}
-
-.em-pm-mode {
-    border: 0;
-    background: none;
-    border-radius: 9px;
-    padding: 8px 4px;
-    color: var(--em-pm-ink-soft);
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-}
-
-.em-pm-mode[aria-pressed="true"] {
-    background: var(--em-pm-surface);
-    color: var(--em-pm-ink);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, .14);
-}
-
 /* Player look tiles */
 .em-pm-looks {
     display: grid;

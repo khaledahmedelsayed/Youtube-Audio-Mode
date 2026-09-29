@@ -75,25 +75,21 @@ const buttonOf = player => player.querySelector('.em-player-btn');
 const menuOf = player => player.querySelector('.em-player-menu');
 const textOf = el => [el, ...el.walk()].map(node => node.textContent).join('');
 
-test('menuModel maps status, mode and look to labels and pressed states', () => {
+test('menuModel maps status and look to labels and pressed states', () => {
     const { ctx } = setupMenu();
     const t = key => `<${key}>`;
-    const model = plain(ctx.menuModel({ onVideo: true, audio: true, reason: 'manual' }, 'filtered', 'waves', t));
+    const model = plain(ctx.menuModel({ onVideo: true, audio: true, reason: 'manual' }, 'waves', t));
 
     assert.equal(model.on, true);
     assert.equal(model.buttonText, 'Earmode · <nowAudio>');
-    assert.deepEqual(model.titles, { thisVideo: '<menuThisVideo>', autoListen: '<menuAutoListen>', playerLook: '<menuPlayerLook>' });
+    assert.deepEqual(model.titles, { thisVideo: '<menuThisVideo>', playerLook: '<menuPlayerLook>' });
     assert.deepEqual(model.switchOptions, [
         { audio: false, label: '<switchVideo>', pressed: false },
         { audio: true, label: '<switchAudio>', pressed: true }
     ]);
     assert.equal(model.showBackToAuto, true);
     assert.equal(model.backToAutoLabel, '<backToAuto>');
-    assert.deepEqual(model.modes.map(mode => [mode.value, mode.label, mode.pressed]), [
-        ['always', '<modeEverything>', false],
-        ['filtered', '<modeMyList>', true],
-        ['off', '<modeNothing>', false]
-    ]);
+    assert.equal('modes' in model, false);
     assert.deepEqual(model.looks.map(look => [look.value, look.label, look.pressed]), [
         ['card', '<lookCard>', false],
         ['blur', '<lookBlur>', false],
@@ -101,10 +97,9 @@ test('menuModel maps status, mode and look to labels and pressed states', () => 
         ['waves', '<lookWaves>', true]
     ]);
 
-    const auto = plain(ctx.menuModel({ onVideo: true, audio: false, reason: 'all' }, 'bogus', 'nope', t));
+    const auto = plain(ctx.menuModel({ onVideo: true, audio: false, reason: 'all' }, 'nope', t));
     assert.equal(auto.buttonText, 'Earmode · <nowVideo>');
     assert.equal(auto.showBackToAuto, false);
-    assert.deepEqual(auto.modes.map(mode => mode.pressed), [true, false, false]);
     assert.deepEqual(auto.looks.map(look => look.pressed), [true, false, false, false]);
 });
 
@@ -131,15 +126,16 @@ test('button reflects the audio state', () => {
     assert.equal(button.dataset.on, 'true');
 });
 
-test('menu is built from elements with SVG icons and three blocks', () => {
+test('menu is built from elements with SVG icons and two blocks', () => {
     const { ctx, player } = setupMenu();
     ctx.ensurePlayerMenu(); // FakeElement throws on innerHTML
     const menu = menuOf(player);
     assert.equal(menu.hidden, true);
     assert.deepEqual(plain(menu.querySelectorAll('.em-pm-title').map(el => el.textContent)),
-        ['menuThisVideo', 'menuAutoListen', 'menuPlayerLook']);
+        ['menuThisVideo', 'menuPlayerLook']);
     assert.equal(menu.querySelectorAll('.em-pm-opt').length, 2);
-    assert.equal(menu.querySelectorAll('.em-pm-mode').length, 3);
+    assert.equal(menu.querySelectorAll('.em-pm-seg').length, 0);
+    assert.equal(menu.querySelectorAll('.em-pm-mode').length, 0);
     assert.equal(menu.querySelectorAll('.em-pm-look').length, 4);
     const svgs = [...menu.walk()].filter(el => el.tagName === 'svg');
     assert.equal(svgs.length, 2);
@@ -164,7 +160,7 @@ test('button toggles the menu and events do not reach the player', () => {
 
     button.dispatch('keydown', { key: 'k' });
     button.dispatch('dblclick');
-    menu.querySelector('.em-pm-mode').dispatch('mousedown');
+    menu.querySelector('.em-pm-look').dispatch('mousedown');
     assert.deepEqual(reached, []);
 
     button.dispatch('click');
@@ -220,14 +216,13 @@ test('back to auto shows for manual picks and clears the override', () => {
     assert.equal(api.getEarmodeStatus().override, null);
 });
 
-test('auto-listen and look buttons write to sync storage', () => {
+test('look buttons write to sync storage', () => {
     const { ctx, player, writes } = setupMenu();
     ctx.ensurePlayerMenu();
     const menu = menuOf(player);
-    menu.querySelectorAll('.em-pm-mode')[2].dispatch('click');
     menu.querySelectorAll('.em-pm-look')[3].dispatch('click');
-    menu.querySelectorAll('.em-pm-mode')[0].dispatch('click'); // already 'always': no write
-    assert.deepEqual(writes, [{ audioModeType: 'off' }, { playerLook: 'waves' }]);
+    menu.querySelectorAll('.em-pm-look')[0].dispatch('click'); // already 'card': no write
+    assert.deepEqual(writes, [{ playerLook: 'waves' }]);
 });
 
 test('direction follows the language and the menu leaves non-video pages', () => {
@@ -266,7 +261,7 @@ test('Escape from outside the menu closes it without moving focus', () => {
     assert.equal(FakeElement.focused, null);
 
     buttonOf(player).dispatch('click');
-    doc.activeElement = menuOf(player).querySelector('.em-pm-mode');
+    doc.activeElement = menuOf(player).querySelector('.em-pm-look');
     docListeners.keydown.forEach(entry => entry.fn(escapeEvent()));
     assert.equal(FakeElement.focused, buttonOf(player));
 });
@@ -375,10 +370,10 @@ test('earmode:state and storage changes re-render the menu', () => {
     run('audioModeEnabled = true; emitEarmodeState()');
     assert.equal(buttonOf(player).dataset.on, 'true');
 
-    run("currentModeType = 'off'");
-    ctx.chrome.storage.onChanged.listeners.forEach(fn => fn({ audioModeType: { newValue: 'off' } }, 'sync'));
-    const pressed = menuOf(player).querySelectorAll('.em-pm-mode').map(el => el.getAttribute('aria-pressed'));
-    assert.deepEqual(plain(pressed), ['false', 'false', 'true']);
+    run("currentPlayerLook = 'waves'");
+    ctx.chrome.storage.onChanged.listeners.forEach(fn => fn({ playerLook: { newValue: 'waves' } }, 'sync'));
+    const pressed = menuOf(player).querySelectorAll('.em-pm-look').map(el => el.getAttribute('aria-pressed'));
+    assert.deepEqual(plain(pressed), ['false', 'false', 'false', 'true']);
 });
 
 test('removePlayerMenu while open drops the document listeners', () => {

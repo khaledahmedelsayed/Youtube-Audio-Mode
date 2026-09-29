@@ -315,10 +315,6 @@
     "message": "This video",
     "description": "Title of the switch block in the in-player menu"
   },
-  "menuAutoListen": {
-    "message": "Auto-listen",
-    "description": "Title of the auto-listen block in the in-player menu"
-  },
   "menuPlayerLook": {
     "message": "Player look",
     "description": "Title of the player look block in the in-player menu"

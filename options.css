@@ -50,8 +50,11 @@
     --ink: #1C1B22;
     --ink-soft: #5E5D6B;
     --line: #DCDCE5;
-    --sun: #F2C14E;
-    --sun-ink: #3A2C05;
+    /* Accent from the accentColor setting (shared.js watchAccent sets --em-accent*) */
+    --sun: var(--em-accent, #F2C14E);
+    --sun-ink: var(--em-accent-ink, #1C1B22);
+    /* Rings and marks on light surfaces need the darker shade */
+    --sun-ring: var(--em-accent-on-light, #8A6508);
     --leaf: #2F8F5B;
     --display: "Fredoka", "Cairo", ui-rounded, "Segoe UI", system-ui, sans-serif;
     --body: "Nunito Sans", "Cairo", "Segoe UI", system-ui, sans-serif;
@@ -66,8 +69,7 @@
         --ink: #EDECF3;
         --ink-soft: #A3A2B2;
         --line: #33323E;
-        --sun: #F2C14E;
-        --sun-ink: #2A1F02;
+        --sun-ring: var(--sun);
         --leaf: #5BC48A;
     }
 }
@@ -125,6 +127,7 @@ body {
 
 .top svg {
     flex: none;
+    color: var(--sun);
 }
 
 .brand {
@@ -331,7 +334,7 @@ h3 {
 }
 
 .look[aria-pressed="true"] .sw {
-    box-shadow: 0 0 0 3px var(--sun);
+    box-shadow: 0 0 0 3px var(--sun-ring);
 }
 
 .sw-card::before {
@@ -691,7 +694,7 @@ button:focus-visible,
 a:focus-visible,
 input:focus-visible,
 select:focus-visible {
-    outline: 3px solid var(--sun);
+    outline: 3px solid var(--sun-ring);
     outline-offset: 2px;
 }
 

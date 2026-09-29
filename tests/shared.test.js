@@ -7,13 +7,14 @@ const vm = require('node:vm');
 // Values from the vm context come from another realm; normalize before deepEqual.
 const plain = value => JSON.parse(JSON.stringify(value));
 
-function loadShared() {
+function loadShared(storage = null) {
     const source = fs.readFileSync(path.join(__dirname, '..', 'shared.js'), 'utf8');
     const context = {
         console: { log() {}, error() {}, warn() {} },
         chrome: {
             i18n: { getMessage: name => `i18n:${name}` },
-            runtime: { getURL: p => `chrome-extension://test/${p}` }
+            runtime: { getURL: p => `chrome-extension://test/${p}` },
+            storage
         },
         fetch: async () => ({ json: async () => ({ hello: { message: 'Hola' } }) })
     };
@@ -439,4 +440,24 @@ test('accentColor is exported and imported only as a known preset id', () => {
     const unknown = api.validateImportedSettings({ settings: { accentColor: '#ff0000', language: 'en' } });
     assert.equal('accentColor' in unknown, false);
     assert.throws(() => api.validateImportedSettings({ settings: { accentColor: 'teal' } }));
+});
+
+test('watchAccent applies the stored accent, then follows changes', async () => {
+    const listeners = [];
+    const storage = {
+        sync: { get: async keys => (plain(keys).includes('accentColor') ? { accentColor: 'coral' } : {}) },
+        onChanged: { addListener: fn => listeners.push(fn) }
+    };
+    const api = loadShared(storage);
+    const props = {};
+    const el = { style: { setProperty: (name, value) => { props[name] = value; } } };
+
+    api.watchAccent(el);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(props['--em-accent'], api.accentPreset('coral').color);
+
+    listeners.forEach(fn => fn({ accentColor: { newValue: 'sky' } }, 'sync'));
+    assert.equal(props['--em-accent'], api.accentPreset('sky').color);
+    listeners.forEach(fn => fn({ accentColor: { newValue: 'mint' } }, 'local'));
+    assert.equal(props['--em-accent'], api.accentPreset('sky').color);
 });

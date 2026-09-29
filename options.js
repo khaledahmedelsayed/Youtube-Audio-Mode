@@ -26,6 +26,9 @@ const {
     removeChannel
 } = globalThis.Earmode;
 
+// Accent color before anything renders; follows changes from other pages
+globalThis.Earmode.watchAccent(document.documentElement);
+
 const TOAST_MS = 2000;
 const DEFAULT_QUALITY = 'hd720';
 const YOUTUBE_TABS = 'https://www.youtube.com/*';

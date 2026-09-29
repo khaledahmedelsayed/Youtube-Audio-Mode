@@ -419,6 +419,20 @@
     }
 
     /**
+     * Keep an element in the stored accent: apply it now and on every accentColor change.
+     * For extension pages (popup, options); content scripts track the accent themselves.
+     * @param {HTMLElement} el Usually document.documentElement
+     */
+    function watchAccent(el) {
+        chrome.storage.sync.get(['accentColor'])
+            .then(result => applyAccent(el, result.accentColor))
+            .catch(error => console.error('[Earmode] Could not read accentColor:', error));
+        chrome.storage.onChanged.addListener((changes, namespace) => {
+            if (namespace === 'sync' && changes.accentColor) applyAccent(el, changes.accentColor.newValue);
+        });
+    }
+
+    /**
      * WCAG 2 relative luminance of a #RRGGBB color.
      * @param {string} hex
      * @returns {number}
@@ -547,6 +561,7 @@
         accentPreset,
         accentVars,
         applyAccent,
+        watchAccent,
         contrastRatio,
         getDefaultFilterRules,
         sanitizeFilterRules,

@@ -24,6 +24,9 @@ const {
     removeChannel
 } = globalThis.Earmode;
 
+// Accent color before anything renders; follows changes from other pages
+globalThis.Earmode.watchAccent(document.documentElement);
+
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 800;
 const SWITCH_REFRESH_MS = 300;

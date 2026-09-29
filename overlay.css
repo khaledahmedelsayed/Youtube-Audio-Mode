@@ -175,13 +175,14 @@
   position: absolute;
   inset: 0;
   z-index: 0;
-  background: linear-gradient(transparent 40%, rgba(0, 0, 0, 0.55));
+  background: linear-gradient(rgba(0, 0, 0, 0.55), transparent 60%);
 }
 
+/* Blur and waves keep their text at the top, clear of YouTube's progress bar and controls */
 #youtube-audio-mode-overlay.earmode-look-blur .em-ov-text {
   position: absolute;
-  inset-inline: 20px;
-  bottom: 22px;
+  inset-inline: 24px;
+  top: 24px;
   display: grid;
   gap: 2px;
 }
@@ -207,10 +208,11 @@
 }
 
 /* ---------- waves ---------- */
+/* Slightly below centre so the line stays clear of the text at the top */
 #youtube-audio-mode-overlay .em-waves {
   position: absolute;
   left: 0;
-  top: 50%;
+  top: 58%;
   width: 200%;
   height: 90px;
   margin-top: -45px;
@@ -225,8 +227,8 @@
 #youtube-audio-mode-overlay.earmode-look-waves .em-ov-text {
   position: absolute;
   z-index: 2;
-  inset-inline: 20px;
-  bottom: 22px;
+  inset-inline: 24px;
+  top: 24px;
   display: grid;
   gap: 2px;
 }
@@ -251,5 +253,14 @@
 @media (prefers-reduced-motion: reduce) {
   #youtube-audio-mode-overlay * {
     animation: none !important;
+  }
+
+  /* The user picked Waves, so it still moves, just slowly */
+  #youtube-audio-mode-overlay .em-waves {
+    animation: em-drift 24s linear infinite !important;
+  }
+
+  #youtube-audio-mode-overlay.paused .em-waves {
+    animation-play-state: paused !important;
   }
 }

@@ -13,8 +13,8 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
  * `dom.player` / `dom.container` can be swapped to simulate YouTube building the player late.
  * Timers set after setup are captured in `timers` instead of running.
  */
-function setupMenu({ search = '?v=dQw4w9WgXcQ', withPlayer = true } = {}) {
-    const api = loadContentScript(createTimers(), { extraScripts: ['player-menu.js'] });
+function setupMenu({ search = '?v=dQw4w9WgXcQ', withPlayer = true, syncStorage = {} } = {}) {
+    const api = loadContentScript(createTimers(), { extraScripts: ['player-menu.js'], syncStorage });
     const ctx = api.context;
     const player = new FakeElement('div');
     player.id = 'movie_player';
@@ -443,4 +443,27 @@ test('synthetic clicks and Escapes from the quality fallback leave the menu open
     buttonOf(player).dispatch('click');
     docListeners.keydown.forEach(entry => entry.fn(escapeEvent()));
     assert.equal(menuOf(player).hidden, true);
+});
+
+test('showPlayerButton false keeps the button off the player', () => {
+    const { ctx, player, timers } = setupMenu({ syncStorage: { showPlayerButton: false } });
+    assert.equal(ctx.ensurePlayerMenu(), false);
+    ctx.schedulePlayerMenu();
+    assert.equal(player.children.length, 0);
+    assert.equal(timers.filter(timer => timer.fn).length, 0); // no retries while hidden
+});
+
+test('changing showPlayerButton removes and restores the button live', () => {
+    const { ctx, player } = setupMenu();
+    ctx.ensurePlayerMenu();
+    assert.equal(player.querySelectorAll('.em-player-btn').length, 1);
+    const change = changes => ctx.chrome.storage.onChanged.listeners.forEach(fn => fn(changes, 'sync'));
+
+    change({ showPlayerButton: { oldValue: true, newValue: false } });
+    assert.equal(player.children.length, 0);
+    assert.equal(ctx.ensurePlayerMenu(), false);
+
+    change({ showPlayerButton: { oldValue: false, newValue: true } });
+    assert.equal(player.querySelectorAll('.em-player-btn').length, 1);
+    assert.equal(player.querySelectorAll('.em-player-menu').length, 1);
 });

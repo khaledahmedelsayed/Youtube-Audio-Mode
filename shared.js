@@ -11,7 +11,8 @@
         'backgroundValue',
         'preferredQuality',
         'filterRules',
-        'playerLook'
+        'playerLook',
+        'showPlayerButton'
     ];
     const VALID_MODE_TYPES = new Set(['always', 'filtered', 'off']);
     const VALID_LANGUAGES = new Set(['en', 'ar']);
@@ -384,6 +385,10 @@
 
         if (PLAYER_LOOKS.includes(source.playerLook)) {
             settings.playerLook = source.playerLook;
+        }
+
+        if (typeof source.showPlayerButton === 'boolean') {
+            settings.showPlayerButton = source.showPlayerButton;
         }
 
         if (Object.keys(settings).length === 0) {

@@ -31,11 +31,12 @@ function createTimers() {
 /**
  * Run content.js in a fresh vm context and return its test API.
  * @param {object} timers - From createTimers()
- * @param {{ extraScripts?: string[] }} [options] - Files (relative to the repo root) run after
- *     content.js in the same context, like later entries of the manifest's content_scripts.js
+ * @param {{ extraScripts?: string[], syncStorage?: object }} [options] - `extraScripts`: files
+ *     (relative to the repo root) run after content.js in the same context, like later entries of
+ *     the manifest's content_scripts.js. `syncStorage`: values chrome.storage.sync.get returns.
  * @returns {object} Test API; `api.context` is the vm global for reaching extra scripts' functions
  */
-function loadContentScript(timers, { extraScripts = [] } = {}) {
+function loadContentScript(timers, { extraScripts = [], syncStorage = {} } = {}) {
     const root = path.join(__dirname, '..', '..');
     const source = fs.readFileSync(path.join(root, 'content.js'), 'utf8');
     const location = {
@@ -111,7 +112,7 @@ function loadContentScript(timers, { extraScripts = [] } = {}) {
             storage: {
                 sync: {
                     get(_keys, callback) {
-                        callback({});
+                        callback({ ...syncStorage });
                     },
                     set() {}
                 },

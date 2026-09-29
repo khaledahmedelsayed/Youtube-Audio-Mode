@@ -43,6 +43,8 @@ const PLAYER_MENU_ICONS = {
 let playerMenuEls = null;
 let playerMenuOpen = false;
 let playerMenuRetryTimer = null;
+/** showPlayerButton sync setting; null until read at load, so nothing mounts before then */
+let playerButtonEnabled = null;
 
 /**
  * Labels and pressed states for the in-player button and menu
@@ -399,7 +401,7 @@ function removePlayerMenu() {
  * @returns {boolean} True when the menu is mounted
  */
 function ensurePlayerMenu() {
-    if (!isOnVideoPage()) {
+    if (!isOnVideoPage() || playerButtonEnabled !== true) {
         removePlayerMenu();
         return false;
     }
@@ -437,18 +439,38 @@ function schedulePlayerMenu(attempt = 0) {
         playerMenuRetryTimer = null;
     }
     const mounted = ensurePlayerMenu();
-    if ((mounted && !playerMenuEls.onFallback) || !isOnVideoPage() || attempt >= PLAYER_MENU_MAX_RETRIES) return;
+    if ((mounted && !playerMenuEls.onFallback) || !isOnVideoPage() || playerButtonEnabled !== true ||
+        attempt >= PLAYER_MENU_MAX_RETRIES) return;
     playerMenuRetryTimer = setTimeout(() => schedulePlayerMenu(attempt + 1), PLAYER_MENU_RETRY_MS);
 }
 
 document.addEventListener('yt-navigate-finish', () => schedulePlayerMenu());
 window.addEventListener('earmode:state', () => ensurePlayerMenu());
 
+/**
+ * Show or hide the button and menu (showPlayerButton setting; anything but false shows it)
+ * @param {*} value
+ */
+function setPlayerButtonEnabled(value) {
+    playerButtonEnabled = value !== false;
+    schedulePlayerMenu();
+}
+
 // Reflect changes made in the popup or options page
 chrome.storage.onChanged.addListener((changes, namespace) => {
-    if (namespace === 'sync' && (changes.audioModeType || changes.playerLook)) {
+    if (namespace !== 'sync') return;
+    if (changes.showPlayerButton) {
+        setPlayerButtonEnabled(changes.showPlayerButton.newValue);
+    } else if (changes.audioModeType || changes.playerLook) {
         renderPlayerMenu();
     }
 });
 
-schedulePlayerMenu();
+try {
+    chrome.storage.sync.get(['showPlayerButton'], result => {
+        setPlayerButtonEnabled(result?.showPlayerButton);
+    });
+} catch (error) {
+    console.log('[Earmode] Could not read showPlayerButton:', error);
+    setPlayerButtonEnabled(true);
+}

@@ -323,6 +323,14 @@
         "message": "شكل المشغل",
         "description": "Title of the player look block in the in-player menu"
     },
+    "showPlayerButton": {
+        "message": "إظهار زر Earmode على مشغل يوتيوب",
+        "description": "Options page switch that shows or hides the in-player button"
+    },
+    "showPlayerButtonHint": {
+        "message": "يظل بإمكانك استخدام النافذة المنبثقة من شريط الأدوات.",
+        "description": "Hint under the show player button switch"
+    },
     "sectionsLabel": {
         "message": "الأقسام",
         "description": "Accessible name of the options page navigation"

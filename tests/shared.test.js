@@ -307,3 +307,12 @@ test('removeKeyword and removeChannel drop one entry without mutating', () => {
     assert.equal(rules.whitelist.keywords.length, 2, 'input not mutated');
     assert.equal(plain(api.removeChannel(rules, 'missing')).whitelist.channels.length, 2);
 });
+
+test('import keeps showPlayerButton only as a boolean', () => {
+    const api = loadShared();
+    assert.ok(plain(api.SETTINGS_EXPORT_KEYS).includes('showPlayerButton'));
+    const off = api.validateImportedSettings({ app: 'earmode', settings: { showPlayerButton: false } });
+    assert.deepEqual(plain(off), { showPlayerButton: false });
+    const text = api.validateImportedSettings({ app: 'earmode', settings: { showPlayerButton: 'no', language: 'en' } });
+    assert.equal('showPlayerButton' in text, false);
+});

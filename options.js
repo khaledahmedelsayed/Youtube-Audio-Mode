@@ -39,6 +39,7 @@ const els = {
     lookButtons: [...document.querySelectorAll('#looks .look')],
     bgColor: $('bg-color'),
     bgValue: $('bg-value'),
+    playerButtonToggle: $('player-button-toggle'),
     channelsList: $('channels-list'),
     channelsEmpty: $('channels-empty'),
     keywordInput: $('keyword-input'),
@@ -67,6 +68,7 @@ const state = {
     mode: 'always',
     look: 'card',
     background: DEFAULT_BACKGROUND_COLOR,
+    showPlayerButton: true,
     quality: DEFAULT_QUALITY,
     filterRules: getDefaultFilterRules(),
     statsLogs: {},
@@ -208,6 +210,7 @@ function renderListening() {
     setPressed(els.lookButtons, 'look', state.look);
     if (document.activeElement !== els.bgColor) els.bgColor.value = state.background;
     els.bgValue.textContent = els.bgColor.value;
+    els.playerButtonToggle.checked = state.showPlayerButton;
 }
 
 function renderList() {
@@ -290,6 +293,17 @@ async function selectLook(look) {
     state.look = look;
     render();
     await saveSync({ playerLook: look }, () => { state.look = previous; });
+}
+
+/**
+ * @param {boolean} show
+ */
+async function selectShowPlayerButton(show) {
+    if (show === state.showPlayerButton) return;
+    const previous = state.showPlayerButton;
+    state.showPlayerButton = show;
+    render();
+    await saveSync({ showPlayerButton: show }, () => { state.showPlayerButton = previous; });
 }
 
 /** Live preview while dragging the colour picker; no storage write. */
@@ -445,13 +459,14 @@ async function importSettings(file) {
 async function loadSettings() {
     const [sync, local] = await Promise.all([
         chrome.storage.sync.get(['audioModeType', 'playerLook', 'backgroundType', 'backgroundValue',
-            'preferredQuality', 'filterRules', 'language']),
+            'preferredQuality', 'filterRules', 'language', 'showPlayerButton']),
         chrome.storage.local.get(['statsLogs', 'activeLogs'])
     ]);
 
     state.mode = VALID_MODE_TYPES.has(sync.audioModeType) ? sync.audioModeType : 'always';
     state.look = PLAYER_LOOKS.includes(sync.playerLook) ? sync.playerLook : 'card';
     state.background = backgroundFrom(sync.backgroundType, sync.backgroundValue);
+    state.showPlayerButton = sync.showPlayerButton !== false;
     state.quality = VALID_QUALITY_VALUES.has(sync.preferredQuality) ? sync.preferredQuality : DEFAULT_QUALITY;
     state.filterRules = sanitizeFilterRules(sync.filterRules);
     state.statsLogs = local.statsLogs || {};
@@ -484,6 +499,7 @@ els.modeButtons.forEach(button => {
 els.lookButtons.forEach(button => {
     button.addEventListener('click', () => selectLook(button.dataset.look));
 });
+els.playerButtonToggle.addEventListener('change', () => selectShowPlayerButton(els.playerButtonToggle.checked));
 els.bgColor.addEventListener('input', previewBackground);
 els.bgColor.addEventListener('change', saveBackground);
 els.bgColor.addEventListener('blur', revertBackgroundPreview);
@@ -527,6 +543,9 @@ chrome.storage.onChanged.addListener(async (changes, namespace) => {
         if (changes.playerLook) {
             const look = changes.playerLook.newValue;
             state.look = PLAYER_LOOKS.includes(look) ? look : 'card';
+        }
+        if (changes.showPlayerButton) {
+            state.showPlayerButton = changes.showPlayerButton.newValue !== false;
         }
         if (changes.filterRules) {
             state.filterRules = sanitizeFilterRules(changes.filterRules.newValue);

@@ -608,6 +608,57 @@ select {
     font-weight: 700;
 }
 
+/* ---------- switch (checkbox with role="switch") ---------- */
+.toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    cursor: pointer;
+}
+
+.toggle .label {
+    color: var(--ink);
+}
+
+.toggle input {
+    appearance: none;
+    flex: none;
+    position: relative;
+    width: 44px;
+    height: 26px;
+    margin: 0;
+    border-radius: 999px;
+    background: var(--ink-soft);
+    cursor: pointer;
+    transition: background .2s;
+}
+
+.toggle input::before {
+    content: "";
+    position: absolute;
+    top: 3px;
+    inset-inline-start: 3px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, .25);
+    transition: transform .2s;
+}
+
+.toggle input:checked {
+    background: var(--sun);
+}
+
+.toggle input:checked::before {
+    transform: translateX(18px);
+}
+
+[dir="rtl"] .toggle input:checked::before {
+    transform: translateX(-18px);
+}
+
 /* ---------- toast ---------- */
 .toast {
     position: fixed;

@@ -1,5 +1,5 @@
-// Shared helpers for the Earmode popup and options page.
-// Loaded as a classic script before the page script; exposes globalThis.Earmode.
+// Shared helpers for the Earmode popup, options page, content scripts and background worker.
+// Loaded as a classic script before the others; exposes globalThis.Earmode and has no side effects.
 
 (function () {
     const DEFAULT_BACKGROUND_COLOR = '#172554';

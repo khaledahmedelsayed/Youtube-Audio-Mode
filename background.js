@@ -1,6 +1,11 @@
 // Background script for Earmode
 // Handles badge updates
 
+importScripts('shared.js');
+
+// Badge colors follow the accentColor setting
+let currentAccent = Earmode.DEFAULT_ACCENT;
+
 // Initialize state on install
 chrome.runtime.onInstalled.addListener(() => {
     chrome.storage.sync.get(['audioModeType'], (result) => {
@@ -12,7 +17,8 @@ chrome.runtime.onInstalled.addListener(() => {
 });
 
 // Also initialize badge on startup (not just install)
-chrome.storage.sync.get(['audioModeType'], (result) => {
+chrome.storage.sync.get(['audioModeType', 'accentColor'], (result) => {
+    currentAccent = Earmode.normalizeAccent(result.accentColor);
     updateBadge(result.audioModeType || 'always');
 });
 
@@ -32,11 +38,19 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
     if (namespace === 'sync' && changes.audioModeType) {
         debouncedUpdateBadge(changes.audioModeType.newValue);
     }
+    if (namespace === 'sync' && changes.accentColor) {
+        currentAccent = Earmode.normalizeAccent(changes.accentColor.newValue);
+        setBadgeColors();
+    }
 });
 
+/**
+ * Paint the badge in the current accent, with its ink for the letter
+ */
 function setBadgeColors() {
-    chrome.action.setBadgeBackgroundColor({ color: '#F2C14E' });
-    if (chrome.action.setBadgeTextColor) chrome.action.setBadgeTextColor({ color: '#1C1B22' });
+    const { color, ink } = Earmode.accentPreset(currentAccent);
+    chrome.action.setBadgeBackgroundColor({ color });
+    if (chrome.action.setBadgeTextColor) chrome.action.setBadgeTextColor({ color: ink });
 }
 
 function updateBadge(modeType) {

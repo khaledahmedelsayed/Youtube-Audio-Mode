@@ -374,5 +374,17 @@
     "alreadyInList": {
         "message": "موجودة بالفعل في قائمتك",
         "description": "Toast when the keyword is already in the list"
+    },
+    "yourListToggle": {
+        "message": "قائمتك ({count})",
+        "description": "Popup button that shows or hides the list. {count} is the number of channels and keywords"
+    },
+    "hintMyListMatch": {
+        "message": "الفيديوهات المطابقة لقائمتك تبدأ بالصوت.",
+        "description": "Popup hint for the My list mode when the list is not empty"
+    },
+    "popupNoChannels": {
+        "message": "اضغط استمع دائمًا على أي فيديو لإضافة قناته.",
+        "description": "Popup list: no channels yet"
     }
 }

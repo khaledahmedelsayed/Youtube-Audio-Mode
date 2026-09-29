@@ -247,6 +247,30 @@
     }
 
     /**
+     * Number of entries (channels and keywords) in the list.
+     * @param {*} filterRules
+     * @returns {number}
+     */
+    function listSize(filterRules) {
+        const { channels, keywords } = sanitizeFilterRules(filterRules).whitelist;
+        return channels.length + keywords.length;
+    }
+
+    /**
+     * Popup hint under the auto-listen choices. The list size lives on the list button,
+     * so the My list hint only explains the mode.
+     * @param {string} mode 'always' | 'filtered' | 'off'
+     * @param {number} size Entries in the list (see listSize)
+     * @param {function(string): string} translate
+     * @returns {string}
+     */
+    function popupModeHint(mode, size, translate) {
+        if (mode === 'always') return translate('hintEverything');
+        if (mode === 'off') return translate('hintNothing');
+        return translate(size === 0 ? 'hintMyListEmpty' : 'hintMyListMatch');
+    }
+
+    /**
      * All channels of a video (collaborations included), deduped by id.
      * Falls back to the primary channelId/channelName.
      * @param {{channelId?: string, channelName?: string, channels?: Array<{id: string, name: string}>}|null} videoInfo
@@ -443,6 +467,8 @@
         formatSavedAmount,
         fillTemplate,
         modeHint,
+        popupModeHint,
+        listSize,
         videoChannels,
         channelsInList,
         toggleChannels,

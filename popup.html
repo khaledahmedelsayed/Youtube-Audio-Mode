@@ -75,6 +75,25 @@
                 <button type="button" data-mode="off" data-i18n="modeNothing" aria-pressed="false">Nothing</button>
             </div>
             <span class="hint" id="mode-hint"></span>
+            <button type="button" class="list-toggle" id="list-toggle" aria-expanded="false"
+                aria-controls="list-panel"></button>
+            <div class="list-panel" id="list-panel" hidden>
+                <div class="list-group">
+                    <span class="list-title" id="list-channels-title" data-i18n="channels">Channels</span>
+                    <ul class="list-rows" id="list-channels" aria-labelledby="list-channels-title"></ul>
+                    <p class="list-empty" id="list-channels-empty" data-i18n="popupNoChannels" hidden></p>
+                </div>
+                <div class="list-group">
+                    <span class="list-title" id="list-keywords-title" data-i18n="keywords">Keywords</span>
+                    <ul class="list-rows" id="list-keywords" aria-labelledby="list-keywords-title"></ul>
+                    <p class="list-empty" id="list-keywords-empty" data-i18n="noKeywords" hidden></p>
+                    <div class="list-add">
+                        <input type="text" id="keyword-input" maxlength="100" autocomplete="off"
+                            data-i18n-placeholder="enterKeyword" data-i18n-aria-label="addKeyword">
+                        <button type="button" id="keyword-add" data-i18n="add">Add</button>
+                    </div>
+                </div>
+            </div>
         </section>
 
         <section class="block">

@@ -13,10 +13,15 @@ const {
     sumMonthSeconds,
     savedMegabytes,
     formatSavedAmount,
-    modeHint,
+    fillTemplate,
+    popupModeHint,
+    listSize,
     videoChannels,
     channelsInList,
-    toggleChannels
+    toggleChannels,
+    addKeyword,
+    removeKeyword,
+    removeChannel
 } = globalThis.Earmode;
 
 const MAX_RETRIES = 3;
@@ -50,6 +55,14 @@ const els = {
     channelAdd: $('channel-add'),
     modeButtons: [...document.querySelectorAll('#mode-seg button')],
     modeHint: $('mode-hint'),
+    listToggle: $('list-toggle'),
+    listPanel: $('list-panel'),
+    channelsList: $('list-channels'),
+    channelsEmpty: $('list-channels-empty'),
+    keywordsList: $('list-keywords'),
+    keywordsEmpty: $('list-keywords-empty'),
+    keywordInput: $('keyword-input'),
+    keywordAdd: $('keyword-add'),
     lookButtons: [...document.querySelectorAll('#looks .look')],
     stats: $('stats'),
     statsText: $('stats-text'),
@@ -150,6 +163,9 @@ async function applyLanguage(lang) {
     document.querySelectorAll('[data-i18n-aria-label]').forEach(el => {
         el.setAttribute('aria-label', t(el.getAttribute('data-i18n-aria-label')));
     });
+    document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+        el.placeholder = t(el.getAttribute('data-i18n-placeholder'));
+    });
 
     els.langBtn.textContent = isArabic ? 'EN' : 'ع';
     els.langBtn.title = t('languageLabel');
@@ -240,7 +256,54 @@ function renderMode() {
         button.setAttribute('aria-pressed', String(button.dataset.mode === state.mode));
     });
 
-    els.modeHint.textContent = modeHint(state.mode, state.filterRules.whitelist.channels.length, t);
+    els.modeHint.textContent = popupModeHint(state.mode, listSize(state.filterRules), t);
+}
+
+/**
+ * Build a list row with a text Remove button on the end side.
+ * @param {string} name
+ * @param {function(): void} onRemove
+ * @returns {HTMLLIElement}
+ */
+function listRow(name, onRemove) {
+    const item = document.createElement('li');
+    item.className = 'list-row';
+    const text = document.createElement('span');
+    text.dir = 'auto';
+    text.textContent = name;
+    text.title = name;
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = t('remove');
+    button.setAttribute('aria-label', fillTemplate(t('removeItem'), { name }));
+    button.addEventListener('click', onRemove);
+    item.append(text, button);
+    return item;
+}
+
+function renderList() {
+    const { channels, keywords } = state.filterRules.whitelist;
+    const expanded = !els.listPanel.hidden;
+
+    els.listToggle.textContent = fillTemplate(t('yourListToggle'), { count: listSize(state.filterRules) });
+    els.listToggle.setAttribute('aria-expanded', String(expanded));
+    if (!expanded) return;
+
+    // Rebuilding the rows drops focus from a Remove button; keep it in the panel
+    const focusInRows = els.channelsList.contains(document.activeElement)
+        || els.keywordsList.contains(document.activeElement);
+
+    els.channelsList.replaceChildren(...channels.map(channel => (
+        listRow(channel.name, () => deleteChannel(channel.id))
+    )));
+    els.channelsEmpty.hidden = channels.length > 0;
+
+    els.keywordsList.replaceChildren(...keywords.map(item => (
+        listRow(item.keyword, () => deleteKeyword(item.keyword))
+    )));
+    els.keywordsEmpty.hidden = keywords.length > 0;
+
+    if (focusInRows && !els.listPanel.contains(document.activeElement)) els.keywordInput.focus();
 }
 
 function renderLooks() {
@@ -259,6 +322,7 @@ function render() {
     renderState();
     renderChannel();
     renderMode();
+    renderList();
     renderLooks();
     renderStats();
 }
@@ -343,6 +407,67 @@ async function toggleCurrentChannels() {
 }
 
 /**
+ * Read the latest rules, apply `change` and save through saveSync.
+ * @param {function(object): object} change Returns the new rules; must not mutate its input
+ * @returns {Promise<{current: object, next: object}|null>} Rules before and after, or null on failure
+ */
+async function updateRules(change) {
+    const previous = state.filterRules;
+    let current;
+    try {
+        const { filterRules } = await chrome.storage.sync.get(['filterRules']);
+        current = sanitizeFilterRules(filterRules);
+    } catch (error) {
+        console.error('[Earmode] Failed to read the list:', error);
+        showToast(t('saveFailed'));
+        return null;
+    }
+    const next = change(current);
+    state.filterRules = next;
+    render();
+    const saved = await saveSync({ filterRules: next }, () => {
+        state.filterRules = previous;
+    });
+    if (!saved) return null;
+    scheduleStatusRefresh(RULES_REFRESH_MS);
+    return { current, next };
+}
+
+async function submitKeyword() {
+    const text = els.keywordInput.value.trim();
+    if (!text) {
+        els.keywordInput.focus();
+        return;
+    }
+    const result = await updateRules(rules => addKeyword(rules, text, Date.now()));
+    if (!result) return;
+    els.keywordInput.value = '';
+    const added = result.next.whitelist.keywords.length > result.current.whitelist.keywords.length;
+    showToast(t(added ? 'addedToList' : 'alreadyInList'));
+}
+
+/**
+ * @param {string} keyword
+ */
+async function deleteKeyword(keyword) {
+    const result = await updateRules(rules => removeKeyword(rules, keyword));
+    if (result) showToast(t('removedFromList'));
+}
+
+/**
+ * @param {string} channelId
+ */
+async function deleteChannel(channelId) {
+    const result = await updateRules(rules => removeChannel(rules, channelId));
+    if (result) showToast(t('removedFromList'));
+}
+
+function toggleList() {
+    els.listPanel.hidden = !els.listPanel.hidden;
+    renderList();
+}
+
+/**
  * @param {string} mode 'always' | 'filtered' | 'off'
  */
 async function selectMode(mode) {
@@ -399,6 +524,14 @@ els.backToAuto.addEventListener('click', backToAuto);
 els.channelAdd.addEventListener('click', toggleCurrentChannels);
 els.modeButtons.forEach(button => {
     button.addEventListener('click', () => selectMode(button.dataset.mode));
+});
+els.listToggle.addEventListener('click', toggleList);
+els.keywordAdd.addEventListener('click', submitKeyword);
+els.keywordInput.addEventListener('keydown', event => {
+    if (event.key === 'Enter' && !event.isComposing) {
+        event.preventDefault();
+        submitKeyword();
+    }
 });
 els.lookButtons.forEach(button => {
     button.addEventListener('click', () => selectLook(button.dataset.look));

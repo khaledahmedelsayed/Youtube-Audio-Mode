@@ -316,3 +316,29 @@ test('import keeps showPlayerButton only as a boolean', () => {
     const text = api.validateImportedSettings({ app: 'earmode', settings: { showPlayerButton: 'no', language: 'en' } });
     assert.equal('showPlayerButton' in text, false);
 });
+
+test('listSize counts channels and keywords in the list', () => {
+    const api = loadShared();
+    assert.equal(api.listSize(undefined), 0);
+    assert.equal(api.listSize({
+        whitelist: {
+            channels: [{ id: 'UC1', name: 'One' }, { id: 'UC2', name: 'Two' }],
+            keywords: [{ keyword: 'lofi' }]
+        }
+    }), 3);
+});
+
+test('popupModeHint does not repeat the list size shown on the list button', () => {
+    const api = loadShared();
+    const messages = {
+        hintEverything: 'Every video starts as audio.',
+        hintMyListEmpty: 'Tap Always listen on a video to start your list.',
+        hintMyListMatch: 'Videos that match your list start as audio.',
+        hintNothing: 'Videos start as normal video.'
+    };
+    const t = key => messages[key];
+    assert.equal(api.popupModeHint('always', 3, t), 'Every video starts as audio.');
+    assert.equal(api.popupModeHint('off', 3, t), 'Videos start as normal video.');
+    assert.equal(api.popupModeHint('filtered', 0, t), 'Tap Always listen on a video to start your list.');
+    assert.equal(api.popupModeHint('filtered', 4, t), 'Videos that match your list start as audio.');
+});

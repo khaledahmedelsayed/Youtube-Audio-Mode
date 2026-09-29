@@ -374,5 +374,17 @@
   "alreadyInList": {
     "message": "Already in your list",
     "description": "Toast when the keyword is already in the list"
+  },
+  "yourListToggle": {
+    "message": "Your list ({count})",
+    "description": "Popup button that shows or hides the list. {count} is the number of channels and keywords"
+  },
+  "hintMyListMatch": {
+    "message": "Videos that match your list start as audio.",
+    "description": "Popup hint for the My list mode when the list is not empty"
+  },
+  "popupNoChannels": {
+    "message": "Tap Always listen on a video to add its channel.",
+    "description": "Popup list: no channels yet"
   }
 }

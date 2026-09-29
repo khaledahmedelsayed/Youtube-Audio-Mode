@@ -271,6 +271,34 @@
     "message": "Waves",
     "description": "Player look name"
   },
+  "accentColor": {
+    "message": "Accent color",
+    "description": "Label above the accent color swatches on the options page"
+  },
+  "accentSunflower": {
+    "message": "Sunflower",
+    "description": "Accent color name, read out for its swatch"
+  },
+  "accentCoral": {
+    "message": "Coral",
+    "description": "Accent color name, read out for its swatch"
+  },
+  "accentMint": {
+    "message": "Mint",
+    "description": "Accent color name, read out for its swatch"
+  },
+  "accentSky": {
+    "message": "Sky",
+    "description": "Accent color name, read out for its swatch"
+  },
+  "accentLilac": {
+    "message": "Lilac",
+    "description": "Accent color name, read out for its swatch"
+  },
+  "accentRose": {
+    "message": "Rose",
+    "description": "Accent color name, read out for its swatch"
+  },
   "playerButtonAudio": {
     "message": "Earmode: audio only",
     "description": "Tooltip and accessible name of the in-player button while audio only is on"

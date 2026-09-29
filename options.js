@@ -11,6 +11,10 @@ const {
     VALID_LANGUAGES,
     VALID_QUALITY_VALUES,
     PLAYER_LOOKS,
+    ACCENT_PRESETS,
+    DEFAULT_ACCENT,
+    normalizeAccent,
+    applyAccent,
     getDefaultFilterRules,
     sanitizeFilterRules,
     validateImportedSettings,
@@ -40,6 +44,8 @@ const els = {
     modeButtons: [...document.querySelectorAll('#mode-seg button')],
     modeHint: $('mode-hint'),
     lookButtons: [...document.querySelectorAll('#looks .look')],
+    accents: $('accents'),
+    accentButtons: [],
     bgColor: $('bg-color'),
     bgValue: $('bg-value'),
     playerButtonToggle: $('player-button-toggle'),
@@ -70,6 +76,7 @@ const els = {
 const state = {
     mode: 'always',
     look: 'card',
+    accent: DEFAULT_ACCENT,
     background: DEFAULT_BACKGROUND_COLOR,
     showPlayerButton: true,
     quality: DEFAULT_QUALITY,
@@ -196,6 +203,39 @@ async function applyLanguage(lang) {
 
 // ---------- rendering ----------
 
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+/**
+ * Build one round swatch button per accent preset (labels are set in renderListening).
+ * @returns {HTMLButtonElement[]}
+ */
+function buildAccentButtons() {
+    return ACCENT_PRESETS.map(preset => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'accent';
+        button.dataset.accent = preset.id;
+        button.setAttribute('aria-pressed', 'false');
+        button.style.setProperty('--swatch', preset.color);
+        button.style.setProperty('--swatch-ink', preset.ink);
+
+        // Check mark, shown on the selected swatch
+        const svg = document.createElementNS(SVG_NS, 'svg');
+        const attrs = {
+            width: '16', height: '16', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor',
+            'stroke-width': '3', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true'
+        };
+        Object.entries(attrs).forEach(([name, value]) => svg.setAttribute(name, value));
+        const check = document.createElementNS(SVG_NS, 'path');
+        check.setAttribute('d', 'M5 12.5l4.5 4.5L19 7.5');
+        svg.appendChild(check);
+        button.appendChild(svg);
+
+        button.addEventListener('click', () => selectAccent(preset.id));
+        return button;
+    });
+}
+
 /**
  * @param {HTMLElement[]} buttons
  * @param {string} key dataset key
@@ -211,6 +251,13 @@ function renderListening() {
     setPressed(els.modeButtons, 'mode', state.mode);
     els.modeHint.textContent = modeHint(state.mode, state.filterRules.whitelist.channels.length, t);
     setPressed(els.lookButtons, 'look', state.look);
+    setPressed(els.accentButtons, 'accent', state.accent);
+    els.accentButtons.forEach((button, index) => {
+        const name = t(ACCENT_PRESETS[index].nameKey);
+        button.setAttribute('aria-label', name);
+        button.title = name;
+    });
+    applyAccent(document.documentElement, state.accent);
     if (document.activeElement !== els.bgColor) els.bgColor.value = state.background;
     els.bgValue.textContent = els.bgColor.value;
     els.playerButtonToggle.checked = state.showPlayerButton;
@@ -296,6 +343,17 @@ async function selectLook(look) {
     state.look = look;
     render();
     await saveSync({ playerLook: look }, () => { state.look = previous; });
+}
+
+/**
+ * @param {string} accent Preset id
+ */
+async function selectAccent(accent) {
+    if (normalizeAccent(accent) !== accent || accent === state.accent) return;
+    const previous = state.accent;
+    state.accent = accent;
+    render();
+    await saveSync({ accentColor: accent }, () => { state.accent = previous; });
 }
 
 /**
@@ -462,12 +520,13 @@ async function importSettings(file) {
 async function loadSettings() {
     const [sync, local] = await Promise.all([
         chrome.storage.sync.get(['audioModeType', 'playerLook', 'backgroundType', 'backgroundValue',
-            'preferredQuality', 'filterRules', 'language', 'showPlayerButton']),
+            'preferredQuality', 'filterRules', 'language', 'showPlayerButton', 'accentColor']),
         chrome.storage.local.get(['statsLogs', 'activeLogs'])
     ]);
 
     state.mode = VALID_MODE_TYPES.has(sync.audioModeType) ? sync.audioModeType : 'always';
     state.look = PLAYER_LOOKS.includes(sync.playerLook) ? sync.playerLook : 'card';
+    state.accent = normalizeAccent(sync.accentColor);
     state.background = backgroundFrom(sync.backgroundType, sync.backgroundValue);
     state.showPlayerButton = sync.showPlayerButton !== false;
     state.quality = VALID_QUALITY_VALUES.has(sync.preferredQuality) ? sync.preferredQuality : DEFAULT_QUALITY;
@@ -502,6 +561,8 @@ els.modeButtons.forEach(button => {
 els.lookButtons.forEach(button => {
     button.addEventListener('click', () => selectLook(button.dataset.look));
 });
+els.accentButtons = buildAccentButtons();
+els.accents.replaceChildren(...els.accentButtons);
 els.playerButtonToggle.addEventListener('change', () => selectShowPlayerButton(els.playerButtonToggle.checked));
 els.bgColor.addEventListener('input', previewBackground);
 els.bgColor.addEventListener('change', saveBackground);
@@ -546,6 +607,9 @@ chrome.storage.onChanged.addListener(async (changes, namespace) => {
         if (changes.playerLook) {
             const look = changes.playerLook.newValue;
             state.look = PLAYER_LOOKS.includes(look) ? look : 'card';
+        }
+        if (changes.accentColor) {
+            state.accent = normalizeAccent(changes.accentColor.newValue);
         }
         if (changes.showPlayerButton) {
             state.showPlayerButton = changes.showPlayerButton.newValue !== false;

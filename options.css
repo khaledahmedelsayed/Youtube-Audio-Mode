@@ -396,6 +396,45 @@ h3 {
     border-radius: 2px;
 }
 
+/* ---------- accent swatches ---------- */
+.accents {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    padding: 4px;
+}
+
+.accent {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border: 0;
+    border-radius: 50%;
+    padding: 0;
+    background: var(--swatch);
+    color: var(--swatch-ink);
+    /* Keeps the lighter swatches visible on the light card */
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .12);
+    cursor: pointer;
+}
+
+.accent svg {
+    visibility: hidden;
+}
+
+.accent[aria-pressed="true"] {
+    box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--ink);
+}
+
+.accent[aria-pressed="true"] svg {
+    visibility: visible;
+}
+
+.accents .accent:focus-visible {
+    outline-offset: 5px;
+}
+
 /* ---------- colour picker ---------- */
 .color-row {
     display: flex;

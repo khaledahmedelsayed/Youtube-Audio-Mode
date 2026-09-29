@@ -271,6 +271,34 @@
         "message": "موجات",
         "description": "Player look name"
     },
+    "accentColor": {
+        "message": "لون التمييز",
+        "description": "Label above the accent color swatches on the options page"
+    },
+    "accentSunflower": {
+        "message": "عبّاد الشمس",
+        "description": "Accent color name, read out for its swatch"
+    },
+    "accentCoral": {
+        "message": "مرجاني",
+        "description": "Accent color name, read out for its swatch"
+    },
+    "accentMint": {
+        "message": "نعناعي",
+        "description": "Accent color name, read out for its swatch"
+    },
+    "accentSky": {
+        "message": "سماوي",
+        "description": "Accent color name, read out for its swatch"
+    },
+    "accentLilac": {
+        "message": "ليلكي",
+        "description": "Accent color name, read out for its swatch"
+    },
+    "accentRose": {
+        "message": "وردي",
+        "description": "Accent color name, read out for its swatch"
+    },
     "playerButtonAudio": {
         "message": "Earmode: الصوت فقط",
         "description": "Tooltip and accessible name of the in-player button while audio only is on"

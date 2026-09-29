@@ -63,6 +63,4 @@ Earmode does not collect any personal data. Settings, your list and stats are ke
 
 MIT License. See [LICENSE](LICENSE).
 
-## Credits
-
-Earmode by [Khaled Ahmed Elsayed](https://github.com/khaledahmedelsayed). It includes code from [YouTube Audio Mode](https://github.com/devahmedadli/youtube-audio-mode) by [Ahmed Adli](https://github.com/devahmedadli), used under the MIT License.
+Earmode by [Khaled Ahmed Elsayed](https://github.com/khaledahmedelsayed).

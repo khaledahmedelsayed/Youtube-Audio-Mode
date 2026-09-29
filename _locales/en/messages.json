@@ -271,6 +271,14 @@
     "message": "Waves",
     "description": "Player look name"
   },
+  "playerButtonAudio": {
+    "message": "Earmode: audio only",
+    "description": "Tooltip and accessible name of the in-player button while audio only is on"
+  },
+  "playerButtonVideo": {
+    "message": "Earmode: video",
+    "description": "Tooltip and accessible name of the in-player button while video plays"
+  },
   "savedThisMonth": {
     "message": "{amount} saved this month",
     "description": "Stats footer. {amount} is like 2.3 GB"

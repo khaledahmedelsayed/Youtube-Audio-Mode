@@ -53,7 +53,7 @@ function menuModel(status, look, translate) {
 
     return {
         on,
-        buttonText: `Earmode · ${translate(on ? 'nowAudio' : 'nowVideo')}`,
+        buttonLabel: translate(on ? 'playerButtonAudio' : 'playerButtonVideo'),
         titles: {
             thisVideo: translate('menuThisVideo'),
             playerLook: translate('menuPlayerLook')
@@ -88,12 +88,13 @@ function playerMenuEl(tag, className) {
 /**
  * Build a stroke icon as real SVG elements
  * @param {'eye'|'headphones'} name
+ * @param {number} [size] - Width and height in pixels
  * @returns {SVGElement}
  */
-function playerMenuIcon(name) {
+function playerMenuIcon(name, size = 18) {
     const svg = document.createElementNS(SVG_NS, 'svg');
     const attrs = {
-        width: '18', height: '18', viewBox: '0 0 24 24', fill: 'none',
+        width: String(size), height: String(size), viewBox: '0 0 24 24', fill: 'none',
         stroke: 'currentColor', 'stroke-width': '2.2', 'stroke-linecap': 'round', 'aria-hidden': 'true'
     };
     Object.entries(attrs).forEach(([key, value]) => svg.setAttribute(key, value));
@@ -237,11 +238,8 @@ function buildPlayerMenu() {
     button.setAttribute('type', 'button');
     button.setAttribute('aria-controls', PLAYER_MENU_ID);
     button.setAttribute('aria-expanded', 'false');
-    const led = playerMenuEl('span', 'em-pm-led');
-    led.setAttribute('aria-hidden', 'true');
-    const label = playerMenuEl('span', 'em-pm-label');
-    button.appendChild(led);
-    button.appendChild(label);
+    // Stroke and cup fill come from CSS, keyed off data-on
+    button.appendChild(playerMenuIcon('headphones', 22));
     button.addEventListener('click', () => setPlayerMenuOpen(!playerMenuOpen, false));
 
     const menu = playerMenuEl('div', 'em-player-menu');
@@ -300,7 +298,7 @@ function buildPlayerMenu() {
     });
 
     return {
-        button, label, menu, switchBox, switchButtons, backToAuto, lookButtons,
+        button, menu, switchBox, switchButtons, backToAuto, lookButtons,
         titles: { thisVideo: thisVideo.title, playerLook: playerLook.title }
     };
 }
@@ -319,7 +317,8 @@ function renderPlayerMenu() {
     els.button.setAttribute('dir', dir);
     els.button.dataset.on = String(model.on);
     els.button.setAttribute('aria-expanded', String(playerMenuOpen));
-    els.label.textContent = model.buttonText;
+    els.button.setAttribute('aria-label', model.buttonLabel);
+    els.button.setAttribute('title', model.buttonLabel);
 
     els.menu.setAttribute('dir', dir);
     els.menu.setAttribute('aria-label', 'Earmode');

@@ -82,7 +82,7 @@ test('menuModel maps status and look to labels and pressed states', () => {
     const model = plain(ctx.menuModel({ onVideo: true, audio: true, reason: 'manual' }, 'waves', t));
 
     assert.equal(model.on, true);
-    assert.equal(model.buttonText, 'Earmode · <nowAudio>');
+    assert.equal(model.buttonLabel, '<playerButtonAudio>');
     assert.deepEqual(model.titles, { thisVideo: '<menuThisVideo>', playerLook: '<menuPlayerLook>' });
     assert.deepEqual(model.switchOptions, [
         { audio: false, label: '<switchVideo>', pressed: false },
@@ -98,7 +98,7 @@ test('menuModel maps status and look to labels and pressed states', () => {
     ]);
 
     const auto = plain(ctx.menuModel({ onVideo: true, audio: false, reason: 'all' }, 'nope', t));
-    assert.equal(auto.buttonText, 'Earmode · <nowVideo>');
+    assert.equal(auto.buttonLabel, '<playerButtonVideo>');
     assert.equal(auto.showBackToAuto, false);
     assert.deepEqual(auto.looks.map(look => look.pressed), [true, false, false, false]);
 });
@@ -115,14 +115,22 @@ test('button reflects the audio state', () => {
     const { api, ctx, player } = setupMenu();
     ctx.ensurePlayerMenu();
     const button = buttonOf(player);
-    assert.equal(textOf(button), 'Earmode · nowVideo');
+    assert.equal(textOf(button), '');
+    assert.equal(button.getAttribute('aria-label'), 'playerButtonVideo');
+    assert.equal(button.getAttribute('title'), 'playerButtonVideo');
+    assert.equal(button.querySelectorAll('.em-pm-led').length, 0);
+    const icon = [...button.walk()].filter(el => el.tagName === 'svg');
+    assert.equal(icon.length, 1);
+    assert.equal(icon[0].getAttribute('width'), '22');
     assert.equal(button.dataset.on, 'false');
     assert.equal(button.getAttribute('aria-expanded'), 'false');
     assert.equal(button.getAttribute('aria-controls'), menuOf(player).id);
 
     api.setAudioModeEnabled(true);
     ctx.renderPlayerMenu();
-    assert.equal(textOf(button), 'Earmode · nowAudio');
+    assert.equal(button.getAttribute('aria-label'), 'playerButtonAudio');
+    assert.equal(button.getAttribute('title'), 'playerButtonAudio');
+    assert.equal([...button.walk()].filter(el => el.tagName === 'svg').length, 1);
     assert.equal(button.dataset.on, 'true');
 });
 

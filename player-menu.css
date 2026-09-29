@@ -36,26 +36,40 @@
     left: auto;
     right: 12px;
     z-index: 65;
-    display: flex;
-    align-items: center;
-    gap: 6px;
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
     margin: 0;
     border: 0;
-    border-radius: 999px;
-    padding-block: 6px;
-    padding-inline: 8px 10px;
-    background: rgba(15, 15, 20, .72);
+    border-radius: 50%;
+    padding: 0;
+    background: rgba(0, 0, 0, .5);
     color: #fff;
-    font-size: 12px;
-    font-weight: 700;
-    line-height: 16px;
-    white-space: nowrap;
     cursor: pointer;
-    backdrop-filter: blur(6px);
     opacity: 0;
     /* Hidden, it must not catch clicks meant for the video; Tab still reaches it */
     pointer-events: none;
-    transition: opacity .25s ease;
+    transition: opacity .25s ease, background .15s ease;
+}
+
+.em-player-btn:hover {
+    background: rgba(0, 0, 0, .7);
+}
+
+.em-player-btn svg {
+    display: block;
+    stroke: #fff;
+    fill: none;
+    stroke-width: 2;
+}
+
+.em-player-btn[data-on="true"] svg {
+    stroke: var(--em-pm-sun);
+}
+
+.em-player-btn[data-on="true"] svg rect {
+    fill: var(--em-pm-sun);
 }
 
 /* Shown with YouTube's controls, while paused, in audio mode, when open or keyboard focused */
@@ -69,29 +83,16 @@
     pointer-events: auto;
 }
 
-.em-pm-led {
-    width: 8px;
-    height: 8px;
-    flex: none;
-    border-radius: 50%;
-    background: #8a8a96;
-}
-
-.em-player-btn[data-on="true"] .em-pm-led {
-    background: var(--em-pm-sun);
-    box-shadow: 0 0 0 3px rgba(242, 193, 78, .3);
-}
-
 /* ---------- menu ---------- */
 .em-player-menu {
     position: absolute;
-    top: 50px;
+    top: 58px;
     left: auto;
     right: 12px;
     z-index: 65;
     width: 268px;
     max-width: calc(100% - 24px);
-    max-height: calc(100% - 62px);
+    max-height: calc(100% - 70px);
     overflow-y: auto;
     background: #1D1C24;
     color: var(--em-pm-ink);
@@ -122,8 +123,8 @@ html[dir="rtl"] .em-player-menu {
 
 #movie_player.ytp-fullscreen > .em-player-menu,
 #movie_player.ytp-embed > .em-player-menu {
-    top: 102px;
-    max-height: calc(100% - 114px);
+    top: 110px;
+    max-height: calc(100% - 122px);
 }
 
 .em-player-menu[hidden] {
@@ -322,7 +323,11 @@ html[dir="rtl"] .em-player-menu {
     border-radius: 2px;
 }
 
-.em-player-btn:focus-visible,
+.em-player-btn:focus-visible {
+    outline: 2px solid var(--em-pm-sun);
+    outline-offset: 2px;
+}
+
 .em-player-menu button:focus-visible {
     outline: 3px solid var(--em-pm-sun);
     outline-offset: 2px;

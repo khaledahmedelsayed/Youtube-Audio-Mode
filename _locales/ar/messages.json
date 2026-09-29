@@ -271,6 +271,14 @@
         "message": "موجات",
         "description": "Player look name"
     },
+    "playerButtonAudio": {
+        "message": "Earmode: الصوت فقط",
+        "description": "Tooltip and accessible name of the in-player button while audio only is on"
+    },
+    "playerButtonVideo": {
+        "message": "Earmode: الفيديو",
+        "description": "Tooltip and accessible name of the in-player button while video plays"
+    },
     "savedThisMonth": {
         "message": "وفّرت {amount} هذا الشهر",
         "description": "Stats footer. {amount} is like 2.3 GB"

@@ -2,8 +2,6 @@
 
 Listen to YouTube with the video turned off. Pick channels that always play as audio and save mobile data.
 
-> Earmode started as a fork of [YouTube Audio Mode](https://github.com/devahmedadli/youtube-audio-mode) by [Ahmed Adli](https://github.com/devahmedadli).
-
 [Install from the Chrome Web Store](https://chromewebstore.google.com/detail/youtube-audio-mode/chjcfgfdkjkodkjcmooholonanhldeeh)
 
 ## What it does
@@ -14,11 +12,11 @@ Earmode plays YouTube videos as sound. It drops the picture to 144p and covers t
 
 - **Video or Audio switch.** Click the Earmode icon on any video and flip one big switch. It only changes the video you have open; the next video follows your auto-listen choice. A line under the switch says why the video plays the way it does, for example "because this channel is in your list". **Back to auto** undoes your pick.
 - **Auto-listen for new videos.** Choose **Everything**, **My list** or **Nothing**.
-- **Your list.** Tap **Always listen** in the popup to add the channel of the video you are watching. Keywords on the settings page also match video titles.
-- **Button on the player.** The Earmode button in the corner of the YouTube player opens the same controls without leaving the video.
+- **Your list.** Tap **Always listen** in the popup to add the channel of the video you are watching. Keywords also match video titles. Open **Your list** in the popup to see, add and remove channels and keywords without leaving the video.
+- **Button on the player.** A round headphones button in the top corner of the YouTube player switches the open video between video and audio and changes the player look. You can hide it on the settings page.
 - **Four player looks.** Card (video art and title), Blur (a blurred copy of the video picture), Simple (a headphones ring on a solid color you choose) and Waves (a slow wave line).
 - **Stats.** Data saved this month and all time, estimated against 720p, plus time listened.
-- **Settings page.** Your channels and keywords, the quality to use when audio is off, background color, backup (export and import) and language.
+- **Settings page.** Your channels and keywords, the quality to use when audio is off, background color, the player button, backup (export and import) and language.
 - **English and Arabic**, with a full right-to-left layout in Arabic.
 - **Private.** Everything stays in your browser. No account, no analytics, no servers.
 
@@ -63,7 +61,8 @@ Earmode does not collect any personal data. Settings, your list and stats are ke
 
 ## License
 
-MIT License.
+MIT License. See [LICENSE](LICENSE).
 
-Original extension by [Ahmed Adli](https://github.com/devahmedadli).
-Earmode by [Khaled Ahmed Elsayed](https://github.com/khaledahmedelsayed).
+## Credits
+
+Earmode by [Khaled Ahmed Elsayed](https://github.com/khaledahmedelsayed). It includes code from [YouTube Audio Mode](https://github.com/devahmedadli/youtube-audio-mode) by [Ahmed Adli](https://github.com/devahmedadli), used under the MIT License.

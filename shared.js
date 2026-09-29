@@ -12,12 +12,29 @@
         'preferredQuality',
         'filterRules',
         'playerLook',
-        'showPlayerButton'
+        'showPlayerButton',
+        'accentColor'
     ];
     const VALID_MODE_TYPES = new Set(['always', 'filtered', 'off']);
     const VALID_LANGUAGES = new Set(['en', 'ar']);
     const VALID_QUALITY_VALUES = new Set(['hd2160', 'hd1440', 'hd1080', 'hd720', 'large', 'medium', 'auto']);
     const PLAYER_LOOKS = ['card', 'blur', 'minimal', 'waves'];
+
+    /**
+     * Accent colors, in the order the options page shows them.
+     * `color` fills and marks on dark surfaces, `ink` is text and icons drawn on `color`,
+     * `onLight` is the darker shade for rings and text on light surfaces.
+     * @type {Array<{id: string, nameKey: string, color: string, ink: string, onLight: string}>}
+     */
+    const ACCENT_PRESETS = [
+        { id: 'sunflower', nameKey: 'accentSunflower', color: '#F2C14E', ink: '#1C1B22', onLight: '#8A6508' },
+        { id: 'coral', nameKey: 'accentCoral', color: '#F0896A', ink: '#1C1B22', onLight: '#B0482A' },
+        { id: 'mint', nameKey: 'accentMint', color: '#5CC8A0', ink: '#1C1B22', onLight: '#1D7757' },
+        { id: 'sky', nameKey: 'accentSky', color: '#6CB2E6', ink: '#1C1B22', onLight: '#2767A0' },
+        { id: 'lilac', nameKey: 'accentLilac', color: '#B09CEE', ink: '#1C1B22', onLight: '#6B50C2' },
+        { id: 'rose', nameKey: 'accentRose', color: '#EC8BAF', ink: '#1C1B22', onLight: '#AE3A68' }
+    ];
+    const DEFAULT_ACCENT = 'sunflower';
 
     const EXPORT_APP_ID = 'earmode';
     const ACCEPTED_APP_IDS = new Set(['earmode', 'youtube-audio-mode']);
@@ -361,6 +378,71 @@
     }
 
     /**
+     * @param {*} id Stored or requested accent id
+     * @returns {string} A known accent id, falling back to DEFAULT_ACCENT
+     */
+    function normalizeAccent(id) {
+        return ACCENT_PRESETS.some(preset => preset.id === id) ? id : DEFAULT_ACCENT;
+    }
+
+    /**
+     * @param {*} id Accent id (unknown ids give the default)
+     * @returns {{id: string, nameKey: string, color: string, ink: string, onLight: string}}
+     */
+    function accentPreset(id) {
+        const known = normalizeAccent(id);
+        return ACCENT_PRESETS.find(preset => preset.id === known);
+    }
+
+    /**
+     * CSS custom properties for an accent. Stylesheets read them with a sunflower fallback.
+     * @param {*} id Accent id (unknown ids give the default)
+     * @returns {{'--em-accent': string, '--em-accent-ink': string, '--em-accent-on-light': string}}
+     */
+    function accentVars(id) {
+        const preset = accentPreset(id);
+        return {
+            '--em-accent': preset.color,
+            '--em-accent-ink': preset.ink,
+            '--em-accent-on-light': preset.onLight
+        };
+    }
+
+    /**
+     * Set the accent custom properties inline on an element.
+     * @param {{style: {setProperty: function(string, string): void}}|null} el
+     * @param {*} id Accent id
+     */
+    function applyAccent(el, id) {
+        if (!el?.style) return;
+        Object.entries(accentVars(id)).forEach(([name, value]) => el.style.setProperty(name, value));
+    }
+
+    /**
+     * WCAG 2 relative luminance of a #RRGGBB color.
+     * @param {string} hex
+     * @returns {number}
+     */
+    function relativeLuminance(hex) {
+        const [r, g, b] = [1, 3, 5].map(index => {
+            const channel = parseInt(hex.slice(index, index + 2), 16) / 255;
+            return channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+        });
+        return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    }
+
+    /**
+     * WCAG 2 contrast ratio between two #RRGGBB colors, from 1 to 21.
+     * @param {string} a
+     * @param {string} b
+     * @returns {number}
+     */
+    function contrastRatio(a, b) {
+        const [light, dark] = [relativeLuminance(a), relativeLuminance(b)].sort((x, y) => y - x);
+        return (light + 0.05) / (dark + 0.05);
+    }
+
+    /**
      * Validate a parsed settings file and return only the supported, valid settings.
      * Accepts files exported by Earmode, by the older YouTube Audio Mode, or with no app id.
      * @param {*} payload Parsed JSON from the settings file.
@@ -415,6 +497,10 @@
             settings.showPlayerButton = source.showPlayerButton;
         }
 
+        if (ACCENT_PRESETS.some(preset => preset.id === source.accentColor)) {
+            settings.accentColor = source.accentColor;
+        }
+
         if (Object.keys(settings).length === 0) {
             throw new Error('No supported settings found');
         }
@@ -455,6 +541,13 @@
         VALID_LANGUAGES,
         VALID_QUALITY_VALUES,
         PLAYER_LOOKS,
+        ACCENT_PRESETS,
+        DEFAULT_ACCENT,
+        normalizeAccent,
+        accentPreset,
+        accentVars,
+        applyAccent,
+        contrastRatio,
         getDefaultFilterRules,
         sanitizeFilterRules,
         validateImportedSettings,

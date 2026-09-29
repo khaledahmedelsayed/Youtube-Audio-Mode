@@ -342,3 +342,101 @@ test('popupModeHint does not repeat the list size shown on the list button', () 
     assert.equal(api.popupModeHint('filtered', 0, t), 'Tap Always listen on a video to start your list.');
     assert.equal(api.popupModeHint('filtered', 4, t), 'Videos that match your list start as audio.');
 });
+
+// ---------- accent color ----------
+
+const INK_CHOICES = ['#1C1B22', '#FFFFFF'];
+const OVERLAY_BG = '#16151c';
+const LIGHT_SURFACES = ['#FFFFFF', '#F1F1F6'];
+const DARK_SURFACES = ['#1D1C24', '#272630'];
+
+test('accent presets are ordered with sunflower first as the default', () => {
+    const api = loadShared();
+    assert.deepEqual(plain(api.ACCENT_PRESETS.map(preset => preset.id)),
+        ['sunflower', 'coral', 'mint', 'sky', 'lilac', 'rose']);
+    assert.equal(api.DEFAULT_ACCENT, 'sunflower');
+    assert.equal(api.ACCENT_PRESETS[0].color, '#F2C14E');
+    api.ACCENT_PRESETS.forEach(preset => {
+        assert.match(preset.color, /^#[0-9A-F]{6}$/, preset.id);
+        assert.match(preset.onLight, /^#[0-9A-F]{6}$/, preset.id);
+        assert.equal(preset.nameKey, `accent${preset.id[0].toUpperCase()}${preset.id.slice(1)}`);
+    });
+});
+
+test('contrastRatio follows the WCAG formula', () => {
+    const api = loadShared();
+    assert.equal(api.contrastRatio('#000000', '#FFFFFF'), 21);
+    assert.equal(api.contrastRatio('#FFFFFF', '#000000'), 21);
+    assert.equal(api.contrastRatio('#777777', '#777777'), 1);
+    assert.ok(Math.abs(api.contrastRatio('#767676', '#FFFFFF') - 4.54) < 0.01);
+});
+
+test('every accent keeps its ink readable (AA, 4.5:1)', () => {
+    const api = loadShared();
+    api.ACCENT_PRESETS.forEach(preset => {
+        assert.ok(INK_CHOICES.includes(preset.ink), `${preset.id} ink`);
+        const ratio = api.contrastRatio(preset.color, preset.ink);
+        assert.ok(ratio >= 4.5, `${preset.id} ink contrast ${ratio.toFixed(2)}`);
+    });
+});
+
+test('every accent reads as text on the dark player overlay (3:1)', () => {
+    const api = loadShared();
+    api.ACCENT_PRESETS.forEach(preset => {
+        const ratio = api.contrastRatio(preset.color, OVERLAY_BG);
+        assert.ok(ratio >= 3, `${preset.id} on overlay ${ratio.toFixed(2)}`);
+    });
+});
+
+test('accent focus rings show on the dark and light popup surfaces (3:1)', () => {
+    const api = loadShared();
+    api.ACCENT_PRESETS.forEach(preset => {
+        DARK_SURFACES.forEach(surface => {
+            const ratio = api.contrastRatio(preset.color, surface);
+            assert.ok(ratio >= 3, `${preset.id} ring on ${surface} ${ratio.toFixed(2)}`);
+        });
+        LIGHT_SURFACES.forEach(surface => {
+            const ratio = api.contrastRatio(preset.onLight, surface);
+            assert.ok(ratio >= 3, `${preset.id} light ring on ${surface} ${ratio.toFixed(2)}`);
+        });
+    });
+});
+
+test('normalizeAccent keeps known ids and falls back to sunflower', () => {
+    const api = loadShared();
+    assert.equal(api.normalizeAccent('mint'), 'mint');
+    assert.equal(api.normalizeAccent('rose'), 'rose');
+    assert.equal(api.normalizeAccent('teal'), 'sunflower');
+    assert.equal(api.normalizeAccent(undefined), 'sunflower');
+    assert.equal(api.normalizeAccent({ id: 'mint' }), 'sunflower');
+});
+
+test('accentVars returns the custom properties for a preset', () => {
+    const api = loadShared();
+    const sky = api.ACCENT_PRESETS.find(preset => preset.id === 'sky');
+    assert.deepEqual(plain(api.accentVars('sky')), {
+        '--em-accent': sky.color,
+        '--em-accent-ink': sky.ink,
+        '--em-accent-on-light': sky.onLight
+    });
+    assert.deepEqual(plain(api.accentVars('nope')), plain(api.accentVars('sunflower')));
+});
+
+test('applyAccent sets the accent properties on an element', () => {
+    const api = loadShared();
+    const props = {};
+    const el = { style: { setProperty: (name, value) => { props[name] = value; } } };
+    api.applyAccent(el, 'lilac');
+    assert.deepEqual(props, plain(api.accentVars('lilac')));
+    assert.doesNotThrow(() => api.applyAccent(null, 'lilac'));
+});
+
+test('accentColor is exported and imported only as a known preset id', () => {
+    const api = loadShared();
+    assert.ok(plain(api.SETTINGS_EXPORT_KEYS).includes('accentColor'));
+    assert.deepEqual(plain(api.validateImportedSettings({ app: 'earmode', settings: { accentColor: 'coral' } })),
+        { accentColor: 'coral' });
+    const unknown = api.validateImportedSettings({ settings: { accentColor: '#ff0000', language: 'en' } });
+    assert.equal('accentColor' in unknown, false);
+    assert.throws(() => api.validateImportedSettings({ settings: { accentColor: 'teal' } }));
+});

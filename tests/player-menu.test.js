@@ -409,7 +409,7 @@ test('document Escape that closes the menu does not reach YouTube', () => {
     assert.equal(closing.prevented, true);
 });
 
-test('synthetic clicks and Escapes from the quality fallback leave the menu open', () => {
+test('synthetic clicks and Escapes leave the menu open', () => {
     const { ctx, player, doc, docListeners } = setupMenu();
     ctx.ensurePlayerMenu();
     const gear = player.appendChild(new FakeElement('button'));
@@ -422,7 +422,7 @@ test('synthetic clicks and Escapes from the quality fallback leave the menu open
     assert.equal(syntheticClick.stopped, false);
     assert.equal(syntheticClick.defaultPrevented, false);
 
-    // closeSettingsPopup dispatches Escape on document, activeElement, body and window
+    // A synthetic Escape from anywhere on the page
     doc.activeElement = new FakeElement('input');
     const syntheticEscape = escapeEvent(false);
     docListeners.keydown.forEach(entry => entry.fn(syntheticEscape));
@@ -521,4 +521,96 @@ test('changing accentColor recolors the button and menu live', () => {
     const lilac = ctx.Earmode.accentVars('lilac')['--em-accent'];
     assert.equal(buttonOf(player).style.props['--em-accent'], lilac);
     assert.equal(menuOf(player).style.props['--em-accent'], lilac);
+});
+
+/**
+ * Open the menu on a video from the given channels
+ */
+function setupListButton({ channels = [{ id: 'UC1', name: 'Song Channel' }], syncStorage = {} } = {}) {
+    const setup = setupMenu({ syncStorage });
+    setup.ctx.getCurrentVideoInfo = () => ({ videoId: 'dQw4w9WgXcQ', channels });
+    setup.ctx.ensurePlayerMenu();
+    buttonOf(setup.player).dispatch('click');
+    const menu = menuOf(setup.player);
+    return { ...setup, row: menu.querySelector('.em-pm-channel'), add: menu.querySelector('.em-pm-add') };
+}
+
+test('list button shows the channel and whether it is in the list', () => {
+    const { row, add, ctx } = setupListButton();
+    assert.equal(row.hidden, false);
+    assert.equal(row.querySelector('.em-pm-channel-name').textContent, 'Song Channel');
+    assert.equal(add.textContent, 'alwaysListen');
+    assert.equal(add.getAttribute('aria-pressed'), 'false');
+
+    const rules = { whitelist: { channels: [{ id: 'UC1', name: 'Song Channel' }], keywords: [] } };
+    ctx.chrome.storage.onChanged.listeners.forEach(fn => fn({ filterRules: { newValue: rules } }, 'sync'));
+    assert.equal(add.textContent, 'inYourList');
+    assert.equal(add.getAttribute('aria-pressed'), 'true');
+    assert.equal(add.dataset.in, 'true');
+});
+
+test('list button hides until the channel is known', () => {
+    const { row, ctx } = setupListButton({ channels: [] });
+    assert.equal(row.hidden, true);
+
+    ctx.getCurrentVideoInfo = () => ({ channels: [{ id: 'UC1', name: 'Song Channel' }] });
+    ctx.renderPlayerMenu();
+    assert.equal(row.hidden, false);
+});
+
+test('list button adds all the channels and keeps what the list already has', async () => {
+    const channels = [{ id: 'UC1', name: 'One' }, { id: 'UC2', name: 'Two' }];
+    const syncStorage = {
+        filterRules: { whitelist: { channels: [{ id: 'UC9', name: 'Old', addedAt: 1 }], keywords: [{ keyword: 'mix', addedAt: 1 }] } }
+    };
+    const { add, writes, ctx } = setupListButton({ channels, syncStorage });
+
+    await ctx.onPlayerMenuList();
+
+    assert.equal(writes.length, 1);
+    const saved = writes[0].filterRules.whitelist;
+    assert.deepEqual(saved.channels.map(channel => channel.id), ['UC9', 'UC1', 'UC2']);
+    assert.deepEqual(saved.keywords.map(item => item.keyword), ['mix']);
+    assert.equal(add.textContent, 'inYourList');
+    assert.equal(add.disabled, false);
+});
+
+test('list button removes the channel when it is in the list', async () => {
+    const syncStorage = { filterRules: { whitelist: { channels: [{ id: 'UC1', name: 'Song Channel' }], keywords: [] } } };
+    const { add, writes, ctx } = setupListButton({ syncStorage });
+    assert.equal(add.textContent, 'inYourList');
+
+    await ctx.onPlayerMenuList();
+
+    assert.deepEqual(writes[0].filterRules.whitelist.channels, []);
+    assert.equal(add.textContent, 'alwaysListen');
+});
+
+test('list button says so when the save fails, and does not change state', async () => {
+    const { add, ctx } = setupListButton();
+    ctx.chrome.storage.sync.set = () => Promise.reject(new Error('QUOTA_BYTES_PER_ITEM quota exceeded'));
+
+    await ctx.onPlayerMenuList();
+
+    assert.equal(add.textContent, 'saveFailed');
+    assert.equal(add.getAttribute('aria-pressed'), 'false');
+    assert.equal(add.disabled, false);
+});
+
+test('a click on the list button does not reach YouTube', () => {
+    const { add } = setupListButton();
+    const event = add.dispatch('click');
+    assert.equal(event.stopped, true);
+});
+
+test('closed menu does not read the page for the channel', () => {
+    const { ctx } = setupMenu();
+    let reads = 0;
+    ctx.getCurrentVideoInfo = () => {
+        reads++;
+        return null;
+    };
+    ctx.ensurePlayerMenu();
+    ctx.renderPlayerMenu();
+    assert.equal(reads, 0);
 });

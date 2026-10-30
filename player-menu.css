@@ -228,6 +228,50 @@ html[dir="rtl"] .em-player-menu {
     cursor: pointer;
 }
 
+/* Channel name + add to list */
+.em-pm-channel {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 4px;
+}
+
+.em-pm-channel[hidden] {
+    display: none;
+}
+
+.em-pm-channel-name {
+    min-width: 0;
+    margin-inline-end: auto;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.em-pm-add {
+    flex: none;
+    border: 0;
+    border-radius: 999px;
+    padding: 6px 10px;
+    background: var(--em-pm-ink);
+    color: #1C1B22;
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.em-pm-add[data-in="true"] {
+    background: var(--em-pm-surface);
+    color: var(--em-pm-ink);
+}
+
+.em-pm-add:disabled {
+    opacity: .6;
+    cursor: default;
+}
+
 /* Player look tiles */
 .em-pm-looks {
     display: grid;

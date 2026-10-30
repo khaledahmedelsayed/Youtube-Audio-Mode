@@ -1,6 +1,6 @@
 // Earmode - in-player button and menu
 // Runs after content.js in the same isolated world and uses its globals:
-// getEarmodeStatus, setVideoAudio, clearOverride, isOnVideoPage, t, currentLanguage,
+// getEarmodeStatus, setVideoAudio, clearOverride, isOnVideoPage, getCurrentVideoInfo, t, currentLanguage,
 // currentPlayerLook, currentAccent, normalizePlayerLook, SVG_NS, and Earmode from shared.js.
 
 const PLAYER_MENU_ID = 'em-player-menu';
@@ -39,15 +39,20 @@ let playerMenuOpen = false;
 let playerMenuRetryTimer = null;
 /** showPlayerButton sync setting; null until read at load, so nothing mounts before then */
 let playerButtonEnabled = null;
+/** filterRules sync setting, for the state of the list button */
+let playerMenuRules = null;
+let playerMenuListPending = false;
+let playerMenuListFailed = false;
 
 /**
  * Labels and pressed states for the in-player button and menu
  * @param {{ audio: boolean, reason: string }} status - From getEarmodeStatus()
  * @param {string} look - One of PLAYER_LOOKS (unknown values count as 'card')
  * @param {function(string): string} translate - Message lookup
+ * @param {{ name: string, inList: boolean, failed: boolean }|null} [channel] - The video's channels, when known
  * @returns {object} Render model
  */
-function menuModel(status, look, translate) {
+function menuModel(status, look, translate, channel = null) {
     const on = status?.audio === true;
     const activeLook = PLAYER_MENU_LOOKS.some(item => item.value === look) ? look : 'card';
 
@@ -65,6 +70,11 @@ function menuModel(status, look, translate) {
         ],
         showBackToAuto: status?.reason === 'manual',
         backToAutoLabel: translate('backToAuto'),
+        channel: channel && {
+            name: channel.name,
+            inList: channel.inList,
+            label: translate(channel.failed ? 'saveFailed' : channel.inList ? 'inYourList' : 'alwaysListen')
+        },
         looks: PLAYER_MENU_LOOKS.map(item => ({
             value: item.value,
             label: translate(item.key),
@@ -108,7 +118,7 @@ function playerMenuIcon(name, size = 18) {
 
 /**
  * Keep an event away from YouTube's player; a user's Escape also closes the menu.
- * Synthetic Escapes (closeSettingsPopup dispatches them on the focused element) do not.
+ * Synthetic Escapes do not.
  * @param {Event} event
  */
 function playerMenuShield(event) {
@@ -147,7 +157,7 @@ function playerMenuHasFocus() {
 
 /**
  * Close on a user's Escape; focus returns to the button only if it was on the button or in the menu.
- * Ignores the synthetic Escapes closeSettingsPopup dispatches.
+ * Ignores synthetic Escapes.
  * @param {KeyboardEvent} event
  */
 function playerMenuDocumentKeydown(event) {
@@ -202,6 +212,46 @@ function onPlayerMenuSwitch(audio) {
     if (!status.onVideo) return;
     if (status.audio === audio && status.reason !== 'manual') return;
     setVideoAudio(audio);
+}
+
+/**
+ * List button handler: add the video's channels to the list, or remove them when all are saved.
+ * The button follows the saved rules, so it only changes when the write worked.
+ */
+async function onPlayerMenuList() {
+    const channels = Earmode.videoChannels(getCurrentVideoInfo());
+    if (channels.length === 0 || playerMenuListPending) return;
+
+    playerMenuListPending = true;
+    playerMenuListFailed = false;
+    renderPlayerMenu();
+    try {
+        const { filterRules } = await chrome.storage.sync.get(['filterRules']);
+        const next = Earmode.toggleChannels(filterRules, channels, Date.now());
+        await chrome.storage.sync.set({ filterRules: next });
+        playerMenuRules = next;
+    } catch (error) {
+        console.log('[Earmode] Could not save the list from player menu:', error);
+        playerMenuListFailed = true;
+    } finally {
+        playerMenuListPending = false;
+        renderPlayerMenu();
+    }
+}
+
+/**
+ * @returns {{ name: string, inList: boolean, failed: boolean }|null} The list row's data; null while the
+ *     menu is closed (no need to read the page) or the video's channels are not known yet
+ */
+function playerMenuChannel() {
+    if (!playerMenuOpen) return null;
+    const channels = Earmode.videoChannels(getCurrentVideoInfo());
+    if (channels.length === 0) return null;
+    return {
+        name: channels.map(channel => channel.name).join(', '),
+        inList: Earmode.channelsInList(playerMenuRules, channels),
+        failed: playerMenuListFailed
+    };
 }
 
 /**
@@ -271,6 +321,18 @@ function buildPlayerMenu() {
     backToAuto.addEventListener('click', () => clearOverride());
     thisVideo.block.appendChild(backToAuto);
 
+    // Channel name + add to list
+    const channelRow = playerMenuEl('div', 'em-pm-channel');
+    channelRow.hidden = true;
+    const channelName = playerMenuEl('span', 'em-pm-channel-name');
+    channelName.setAttribute('dir', 'auto');
+    const listButton = playerMenuEl('button', 'em-pm-add');
+    listButton.setAttribute('type', 'button');
+    listButton.addEventListener('click', onPlayerMenuList);
+    channelRow.appendChild(channelName);
+    channelRow.appendChild(listButton);
+    thisVideo.block.appendChild(channelRow);
+
     // Player look tiles
     const looks = playerMenuEl('div', 'em-pm-looks');
     const lookButtons = PLAYER_MENU_LOOKS.map(({ value }) => {
@@ -298,7 +360,7 @@ function buildPlayerMenu() {
     });
 
     return {
-        button, menu, switchBox, switchButtons, backToAuto, lookButtons,
+        button, menu, switchBox, switchButtons, backToAuto, channelRow, channelName, listButton, lookButtons,
         titles: { thisVideo: thisVideo.title, playerLook: playerLook.title }
     };
 }
@@ -311,7 +373,7 @@ function renderPlayerMenu() {
     if (!els) return;
 
     const status = getEarmodeStatus();
-    const model = menuModel(status, currentPlayerLook, t);
+    const model = menuModel(status, currentPlayerLook, t, playerMenuChannel());
     const dir = currentLanguage === 'ar' ? 'rtl' : 'ltr';
 
     Earmode.applyAccent(els.button, currentAccent);
@@ -338,6 +400,16 @@ function renderPlayerMenu() {
     });
     els.backToAuto.hidden = !model.showBackToAuto;
     els.backToAuto.textContent = model.backToAutoLabel;
+
+    els.channelRow.hidden = !model.channel;
+    if (model.channel) {
+        els.channelName.textContent = model.channel.name;
+        els.channelName.setAttribute('title', model.channel.name);
+        els.listButton.textContent = model.channel.label;
+        els.listButton.dataset.in = String(model.channel.inList);
+        els.listButton.setAttribute('aria-pressed', String(model.channel.inList));
+        els.listButton.disabled = playerMenuListPending;
+    }
 
     model.looks.forEach((item, index) => {
         const { lookButton, text } = els.lookButtons[index];
@@ -421,6 +493,8 @@ function schedulePlayerMenu(attempt = 0) {
 }
 
 document.addEventListener('yt-navigate-finish', () => schedulePlayerMenu());
+// The channel name is reliable by now
+document.addEventListener('yt-page-data-updated', () => renderPlayerMenu());
 window.addEventListener('earmode:state', () => ensurePlayerMenu());
 
 /**
@@ -435,15 +509,17 @@ function setPlayerButtonEnabled(value) {
 // Reflect changes made in the popup or options page
 chrome.storage.onChanged.addListener((changes, namespace) => {
     if (namespace !== 'sync') return;
+    if (changes.filterRules) playerMenuRules = changes.filterRules.newValue;
     if (changes.showPlayerButton) {
         setPlayerButtonEnabled(changes.showPlayerButton.newValue);
-    } else if (changes.playerLook) {
+    } else if (changes.playerLook || changes.filterRules) {
         renderPlayerMenu();
     }
 });
 
 try {
-    chrome.storage.sync.get(['showPlayerButton'], result => {
+    chrome.storage.sync.get(['showPlayerButton', 'filterRules'], result => {
+        playerMenuRules = result?.filterRules;
         setPlayerButtonEnabled(result?.showPlayerButton);
     });
 } catch (error) {

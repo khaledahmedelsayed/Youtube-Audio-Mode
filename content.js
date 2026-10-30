@@ -18,7 +18,10 @@ const TIMING = {
     UI_INTERACTION_STEP: 100,
     UI_INTERACTION_FINAL: 200,
     QUALITY_RETRY_DELAY: 250,
-    API_VERIFICATION_DELAY: 500
+    SOFT_DROP_WAIT: 90000, // YouTube reports the new quality only at its next download
+    RELOAD_HOLD_POLL: 50,
+    RELOAD_START_WAIT: 1000,
+    RELOAD_HOLD_MAX: 4000
 };
 
 const DATA_RATES_MB_PER_MIN = {
@@ -36,8 +39,30 @@ const QUALITY = {
 // Qualities worth restoring after audio mode (same list as the options page)
 const RESTORABLE_QUALITIES = new Set(['hd2160', 'hd1440', 'hd1080', 'hd720', 'large', 'medium', 'auto']);
 
+// Best to worst
+const QUALITY_ORDER = ['hd2160', 'hd1440', 'hd1080', 'hd720', 'large', 'medium', 'small', 'tiny'];
+
+// Quality codes to the text of the settings menu rows
+const QUALITY_TEXT = {
+    'hd2160': '2160p',
+    'hd1440': '1440p',
+    'hd1080': '1080p',
+    'hd720': '720p',
+    'large': '480p',
+    'medium': '360p',
+    'small': '240p',
+    'tiny': '144p',
+    'auto': 'Auto'
+};
+
 const LOWEST_QUALITY_RETRY = {
     MAX_ATTEMPTS: 3
+};
+
+// How long to wait for YouTube to list a new video's qualities
+const QUALITY_LEVELS_WAIT = {
+    DELAY: 500,
+    MAX_ATTEMPTS: 20
 };
 
 // ===== STATE VARIABLES =====
@@ -53,6 +78,9 @@ let overlayListenerVideo = null; // Video element the overlay play/pause handler
 let lastAppliedVideoId = null;
 let currentModeType = 'always'; // 'always' or 'filtered'
 let savedQualityBeforeAudioMode = null; // Store user's quality to restore later
+let audioModeVideoId = null; // Video that audio mode last applied to
+let softDropAskedAt = 0; // When the player was asked to drop quality without a reload
+let endReloadHold = null; // Ends the running holdUntilQualityReloaded, if any
 let modeApplyTimeout = null;
 let modeApplyGeneration = 0;
 let modeApplyInProgress = false;
@@ -274,6 +302,7 @@ function emitEarmodeState() {
  */
 function applyDecision({ audio }) {
     if (audio) {
+        audioModeVideoId = getCurrentVideoId();
         if (!audioModeEnabled) {
             enableAudioMode(true); // fromAutoRule = true, don't persist
         } else {
@@ -369,7 +398,7 @@ function applyPreferredQuality() {
  * @param {Function} onComplete - Callback when operation completes
  */
 function applyPreferredQualityInternal(onComplete = null) {
-    const player = document.getElementById('movie_player');
+    const player = getPlayer();
     const video = getVideoElement();
 
     if (!player || !video) {
@@ -379,68 +408,40 @@ function applyPreferredQualityInternal(onComplete = null) {
     }
 
     chrome.storage.sync.get(['preferredQuality'], (result) => {
-        let quality = result.preferredQuality;
-        if (!quality || quality === 'auto') {
+        const preferred = result.preferredQuality;
+        if (!preferred || preferred === 'auto') {
             // Auto or not set - let YouTube handle it
             onComplete?.();
             return;
         }
 
-        // Map quality codes to UI text for click fallback
-        const qualityToText = {
-            'hd2160': '2160p',
-            'hd1440': '1440p',
-            'hd1080': '1080p',
-            'hd720': '720p',
-            'large': '480p',
-            'medium': '360p',
-            'small': '240p',
-            'tiny': '144p'
-        };
-        let uiTargetText = qualityToText[quality] || '720p';
+        whenQualityLevelsReady(player, levels => {
+            const quality = resolveQuality(preferred, levels);
+            console.log('[Earmode] Applying preferred quality:', quality, 'wanted:', preferred);
 
-        // Check if preferred quality is available, fall back to next best if not
-        const availableLevels = player.getAvailableQualityLevels ? player.getAvailableQualityLevels() : [];
-        if (availableLevels.length > 0 && !availableLevels.includes(quality)) {
-            // Quality hierarchy to find next best available
-            const qualityOrder = ['hd2160', 'hd1440', 'hd1080', 'hd720', 'large', 'medium', 'small', 'tiny'];
-            const preferredIndex = qualityOrder.indexOf(quality);
-
-            // Find next available quality at or below preferred
-            let fallback = availableLevels.find(q => qualityOrder.indexOf(q) >= preferredIndex);
-            if (!fallback) fallback = 'auto';
-
-            console.log('[Earmode] Preferred quality', quality, 'not available, using:', fallback);
-            quality = fallback;
-            uiTargetText = qualityToText[quality] || 'Auto';
-        }
-
-        console.log('[Earmode] Applying preferred quality:', quality);
-
-        try {
-            // Try API methods first
-            if (player.setPlaybackQualityRange) {
-                player.setPlaybackQualityRange(quality, quality);
-            }
-            if (player.setPlaybackQuality) {
-                player.setPlaybackQuality(quality);
-            }
-
-            // Verify after a moment and use UI fallback if needed
-            setTimeout(() => {
-                const currentQuality = player.getPlaybackQuality ? player.getPlaybackQuality() : 'unknown';
-
-                if (currentQuality !== quality) {
-                    console.log('[Earmode] API failed, using UI click for preferred quality');
-                    clickQualitySetting(video, uiTargetText, onComplete);
-                } else {
-                    onComplete?.();
+            try {
+                if (getPlayerQuality(player) !== quality) {
+                    if (player.setPlaybackQualityRange) {
+                        player.setPlaybackQualityRange(quality, quality);
+                    }
+                    if (player.setPlaybackQuality) {
+                        player.setPlaybackQuality(quality);
+                    }
                 }
-            }, 500);
-        } catch (e) {
-            console.log('[Earmode] Could not apply preferred quality:', e);
-            onComplete?.();
-        }
+
+                if (levels) {
+                    onComplete?.();
+                    return;
+                }
+
+                // The player API cannot be reached: the settings menu is the only way
+                console.log('[Earmode] No player API, using UI click for preferred quality');
+                clickQualitySetting(QUALITY_TEXT[quality], onComplete);
+            } catch (e) {
+                console.log('[Earmode] Could not apply preferred quality:', e);
+                onComplete?.();
+            }
+        });
     });
 }
 
@@ -579,6 +580,7 @@ function clearVideoCache() {
  * This allows the UI fallback to work on the new video
  */
 function resetQualityAttemptFlag() {
+    softDropAskedAt = 0;
     const player = document.getElementById('movie_player');
     if (player) {
         delete player.__audioModeQualityAttempted;
@@ -591,6 +593,77 @@ function isAudioModeQuality(quality) {
 
 function getPlayerQuality(player) {
     return player?.getPlaybackQuality ? player.getPlaybackQuality() : 'unknown';
+}
+
+/**
+ * Call a YouTube player method through player-bridge.js.
+ * Events dispatch synchronously across worlds, so the answer is here when dispatchEvent returns.
+ * @param {string} method - Player method name
+ * @param {...*} args - JSON-safe arguments
+ * @returns {*} The method's result; undefined when the bridge or the method is missing
+ */
+function callPlayer(method, ...args) {
+    let result;
+    const onResult = event => {
+        result = JSON.parse(event.detail).result;
+    };
+    document.addEventListener('earmode:player-result', onResult);
+    document.dispatchEvent(new CustomEvent('earmode:player-call', {
+        detail: JSON.stringify({ method, args })
+    }));
+    document.removeEventListener('earmode:player-result', onResult);
+    return result;
+}
+
+/**
+ * Get the YouTube player API for the current page
+ * @returns {object|null} Player methods, or null when the player is not on the page yet
+ */
+function getPlayer() {
+    if (!document.getElementById('movie_player')) return null;
+    return {
+        getAvailableQualityLevels: () => callPlayer('getAvailableQualityLevels'),
+        getPlaybackQuality: () => callPlayer('getPlaybackQuality'),
+        setPlaybackQualityRange: (min, max) => callPlayer('setPlaybackQualityRange', min, max),
+        setPlaybackQuality: quality => callPlayer('setPlaybackQuality', quality)
+    };
+}
+
+/**
+ * Run a callback once YouTube has listed the video's qualities
+ * @param {object} player - Player methods
+ * @param {function(string[]|null): void} callback - Gets the levels, or null when the player API cannot be reached
+ * @param {number} attempts - Waits left
+ */
+function whenQualityLevelsReady(player, callback, attempts = QUALITY_LEVELS_WAIT.MAX_ATTEMPTS) {
+    const levels = player.getAvailableQualityLevels ? player.getAvailableQualityLevels() : null;
+    if (!Array.isArray(levels)) {
+        callback(null);
+    } else if (levels.length === 0 && attempts > 0) {
+        setTimeout(() => whenQualityLevelsReady(player, callback, attempts - 1), QUALITY_LEVELS_WAIT.DELAY);
+    } else {
+        callback(levels);
+    }
+}
+
+/**
+ * Pick the quality to ask for: the wanted one, or the best one below it when the video lacks it
+ * @param {string} wanted - Quality code
+ * @param {string[]|null} levels - The video's qualities, when known
+ * @returns {string} Quality code; 'auto' when the video has nothing at or below the wanted one
+ */
+function resolveQuality(wanted, levels) {
+    if (wanted === 'auto' || !levels?.length || levels.includes(wanted)) return wanted;
+    const lower = QUALITY_ORDER.slice(QUALITY_ORDER.indexOf(wanted) + 1);
+    return lower.find(quality => levels.includes(quality)) || 'auto';
+}
+
+/**
+ * @param {string[]|null} levels - The video's qualities, when known
+ * @returns {string} The video's lowest quality code; 144p when the levels are not known
+ */
+function lowestQuality(levels) {
+    return [...QUALITY_ORDER].reverse().find(quality => levels?.includes(quality)) || QUALITY.TARGET;
 }
 
 /**
@@ -913,6 +986,7 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
 
 async function enableAudioMode(fromAutoRule = false) {
     audioModeEnabled = true;
+    endReloadHold?.();
 
     // Reset quality attempt flag to allow fresh UI fallback attempt
     // This is important when enabling audio mode after adding a channel to whitelist
@@ -927,7 +1001,7 @@ async function enableAudioMode(fromAutoRule = false) {
 
     // Remember the current quality in memory, used on restore when no preferred
     // quality is stored. The stored preference is only set on the options page.
-    const player = document.getElementById('movie_player');
+    const player = getPlayer();
     if (player && player.getPlaybackQuality) {
         const currentQuality = player.getPlaybackQuality();
         // Skip audio mode's own 144p/240p and values YouTube cannot be set back to
@@ -990,10 +1064,23 @@ function disableAudioMode(fromAutoRule = false) {
 
     // Find the video player
     const video = getVideoElement();
-    if (video) {
-        video.style.opacity = '1';
-        video.style.maxHeight = '';
-        video.style.minHeight = '';
+    const overlay = audioModeOverlay;
+    audioModeOverlay = null;
+
+    const showVideo = () => {
+        if (video) {
+            video.style.opacity = '1';
+            video.style.maxHeight = '';
+            video.style.minHeight = '';
+        }
+        overlay?.remove();
+    };
+
+    // After a navigation the video's position is not from the video audio mode was playing
+    if (video && overlay && audioModeVideoId === getCurrentVideoId()) {
+        holdUntilQualityReloaded(video, showVideo);
+    } else {
+        showVideo();
     }
 
     // Restore quality settings
@@ -1013,12 +1100,6 @@ function disableAudioMode(fromAutoRule = false) {
 
     // Clean up overlay play/pause listeners
     detachOverlayVideoListeners();
-
-    // Remove overlay
-    if (audioModeOverlay) {
-        audioModeOverlay.remove();
-        audioModeOverlay = null;
-    }
 
     // Save preference (only if manually disabled, not from auto-rules)
     if (!fromAutoRule && chrome.runtime?.id) {
@@ -1041,40 +1122,89 @@ function disableAudioMode(fromAutoRule = false) {
     emitEarmodeState();
 }
 
+/**
+ * Keep the sound off and the overlay up while YouTube reloads the video for a new quality.
+ * The reload blanks the picture and restarts a little before the point it left, so without
+ * this the last moment plays twice.
+ * @param {HTMLVideoElement} video - The video element
+ * @param {Function} release - Runs when the video has caught up, or when the wait runs out
+ */
+function holdUntilQualityReloaded(video, release) {
+    endReloadHold?.();
+
+    const wasMuted = video.muted;
+    const startedAt = Date.now();
+    let leftAt = video.currentTime;
+    let reloaded = false;
+    let timer = null;
+
+    const onEmptied = () => {
+        reloaded = true;
+    };
+    const end = () => {
+        clearTimeout(timer);
+        video.removeEventListener('emptied', onEmptied);
+        video.muted = wasMuted;
+        endReloadHold = null;
+        release();
+    };
+    const check = () => {
+        const waited = Date.now() - startedAt;
+        const caughtUp = reloaded && !video.seeking && video.readyState >= 3 &&
+            (video.paused || video.currentTime >= leftAt);
+
+        if (caughtUp || waited >= (reloaded ? TIMING.RELOAD_HOLD_MAX : TIMING.RELOAD_START_WAIT)) {
+            end();
+            return;
+        }
+        if (!reloaded) {
+            leftAt = video.currentTime;
+        }
+        timer = setTimeout(check, TIMING.RELOAD_HOLD_POLL);
+    };
+
+    video.muted = true;
+    video.addEventListener('emptied', onEmptied);
+    endReloadHold = end;
+    check();
+}
+
 // Track current quality setting operation to cancel stale callbacks
 let currentQualityOperationId = 0;
-
-function createEscapeKeyEvent() {
-    return new KeyboardEvent('keydown', {
-        key: 'Escape',
-        code: 'Escape',
-        keyCode: 27,
-        which: 27,
-        bubbles: true,
-        cancelable: true
-    });
-}
-
-function dispatchEscapeKey(target) {
-    if (target?.dispatchEvent) {
-        target.dispatchEvent(createEscapeKeyEvent());
-    }
-}
 
 function isSettingsButtonExpanded(settingsButton) {
     return settingsButton?.getAttribute?.('aria-expanded') === 'true';
 }
 
+// Closes with the gear button only: an Escape key event would also close whatever
+// the user just opened, like YouTube's Save dialog.
 function closeSettingsPopup() {
-    dispatchEscapeKey(document.activeElement);
-    dispatchEscapeKey(document);
-    dispatchEscapeKey(document.body);
-    dispatchEscapeKey(window);
-
     const settingsButton = document.querySelector('.ytp-settings-button');
     if (isSettingsButtonExpanded(settingsButton)) {
         settingsButton.click();
     }
+}
+
+/**
+ * Find the settings menu row for a quality: the highest resolution at or below the target,
+ * else the lowest one listed. 'Auto' has no resolution and matches by text.
+ * @param {Array<{textContent: string}>} items - Menu rows
+ * @param {string} targetText - Like '1080p' or 'Auto'
+ * @returns {object|undefined} The row to click
+ */
+function pickQualityMenuItem(items, targetText) {
+    const targetHeight = parseInt(targetText, 10);
+    if (!targetHeight) return items.find(item => item.textContent.includes(targetText));
+
+    const rows = items
+        .map(item => ({ item, height: parseInt(item.textContent.match(/(\d{3,4})p/)?.[1], 10) }))
+        .filter(row => row.height);
+    // A later row wins a tie: YouTube lists "1080p Premium" above plain "1080p"
+    const best = rows
+        .filter(row => row.height <= targetHeight)
+        .reduce((top, row) => (!top || row.height >= top.height ? row : top), null);
+    const lowest = rows.reduce((low, row) => (!low || row.height < low.height ? row : low), null);
+    return (best || lowest)?.item;
 }
 
 /**
@@ -1098,19 +1228,17 @@ function resetSettingsUIStyles() {
 }
 
 /**
- * Function to interact with YouTube's quality settings UI (invisibly)
- * @param {HTMLVideoElement} video - The video element
+ * Function to interact with YouTube's quality settings UI (invisibly).
+ * Last resort for when the player API cannot be reached: while the hidden menu is open,
+ * YouTube spends the user's next click on closing it.
  * @param {string} targetText - The text to look for (e.g. '144p', '720p', 'Auto')
  * @param {Function} onComplete - Optional callback when operation completes
  */
-const clickQualitySetting = (video, targetText = '144p', onComplete = null) => {
+const clickQualitySetting = (targetText = '144p', onComplete = null) => {
     // Increment operation ID to invalidate any pending callbacks
     const operationId = ++currentQualityOperationId;
 
     try {
-        const wasPlaying = !video.paused;
-        const currentTime = video.currentTime;
-
         // Hide the settings panel from view (re-query each time)
         const settingsPanel = document.querySelector('.ytp-settings-menu');
         const popup = document.querySelector('.ytp-popup');
@@ -1157,25 +1285,7 @@ const clickQualitySetting = (video, targetText = '144p', onComplete = null) => {
                         }
 
                         const menuItems = Array.from(document.querySelectorAll('.ytp-menuitem'));
-                        const targetOption = menuItems.find(item => item.textContent.includes(targetText));
-
-                        if (targetOption) {
-                            targetOption.click();
-                        } else {
-                            if (targetText === '144p') {
-                                const allQualities = document.querySelectorAll('.ytp-menuitem');
-                                if (allQualities.length > 0) {
-                                    allQualities[allQualities.length - 1].click();
-                                }
-                            }
-                            // If we were looking for 720p (restore), maybe try Auto?
-                            else if (targetText === '720p') {
-                                const autoOption = menuItems.find(item => item.textContent.includes('Auto'));
-                                if (autoOption) {
-                                    autoOption.click();
-                                }
-                            }
-                        }
+                        pickQualityMenuItem(menuItems, targetText)?.click();
 
                         // Close and cleanup
                         setTimeout(() => {
@@ -1193,11 +1303,6 @@ const clickQualitySetting = (video, targetText = '144p', onComplete = null) => {
                             setTimeout(() => {
                                 // Always reset styles, regardless of operation validity
                                 resetSettingsUIStyles();
-
-                                if (wasPlaying && video.paused) {
-                                    video.currentTime = currentTime;
-                                    video.play().catch(err => console.log('[Earmode] Could not resume:', err));
-                                }
 
                                 // Signal completion
                                 onComplete?.();
@@ -1240,97 +1345,67 @@ const forceLowestQuality = (player, video, onComplete = null, options = {}) => {
             return;
         }
 
-        // Save the current playback state
-        const wasPlaying = !video.paused;
-        const currentTime = video.currentTime;
-        const restorePlaybackState = () => {
-            if (wasPlaying && video.paused) {
-                video.currentTime = currentTime;
-                video.play().catch(err => console.log('[Earmode] Could not resume playback:', err));
+        whenQualityLevelsReady(player, levels => {
+            const target = lowestQuality(levels);
+
+            if (getPlayerQuality(player) !== target && player.setPlaybackQualityRange) {
+                if (!softDropAskedAt) {
+                    // A minimum alone lets YouTube play out what it already downloaded and move
+                    // to the new quality with no reload. An exact pair reloads the video, which
+                    // replays the last moment. A locked pair ignores a minimum, so clear it first.
+                    player.setPlaybackQualityRange('auto', 'auto');
+                    player.setPlaybackQualityRange(target, 'auto');
+                    softDropAskedAt = Date.now();
+                } else if (Date.now() - softDropAskedAt >= TIMING.SOFT_DROP_WAIT) {
+                    // YouTube ignored the minimum. Saving data matters more than the reload.
+                    player.setPlaybackQualityRange(target, target);
+                }
             }
-        };
 
-        // Method 1: Try the standard API methods
-        const availableLevels = player.getAvailableQualityLevels ? player.getAvailableQualityLevels() : [];
-
-        if (player.setPlaybackQuality) {
-            player.setPlaybackQuality('tiny');
-        }
-
-        if (player.setPlaybackQualityRange) {
-            // Clear any potential previous locks first?
-            // player.setPlaybackQualityRange('auto', 'auto');
-            // Lock to tiny
-            player.setPlaybackQualityRange('tiny', 'tiny');
-        }
-
-        // Method 2: Try using internal YouTube methods
-        if (typeof player.setInternalQuality === 'function') {
-            player.setInternalQuality('tiny');
-        }
-
-        // Method 3: Directly set the quality using YouTube's internal state
-        if (player.playerInfo && player.playerInfo.setPlaybackQuality) {
-            player.playerInfo.setPlaybackQuality('tiny');
-        }
-
-        // Method 4: Disable auto quality by forcing preference
-        if (player.setPreferredQuality) {
-            player.setPreferredQuality('tiny');
-        }
-
-        // Wait a moment for quality to be applied
-        setTimeout(() => {
-            if (!audioModeEnabled) {
-                restorePlaybackState();
+            if (levels) {
                 onComplete?.();
                 return;
             }
 
-            // Verify current quality
-            const currentQuality = getPlayerQuality(player);
-
-            if (!isAudioModeQuality(currentQuality)) {
-                console.log(`[Earmode] API methods failed on attempt ${attempt}, using UI interaction...`);
-
-                try {
-                    clickQuality(video, '144p', () => {
-                        setTimeout(() => {
-                            const qualityAfterClick = getPlayerQuality(player);
-
-                            if (isAudioModeQuality(qualityAfterClick)) {
-                                player.__audioModeQualityAttempted = true;
-                                onComplete?.();
-                                return;
-                            }
-
-                            if (audioModeEnabled && attempt < LOWEST_QUALITY_RETRY.MAX_ATTEMPTS) {
-                                console.log(`[Earmode] 144p was not applied after UI interaction; retrying (${attempt + 1}/${LOWEST_QUALITY_RETRY.MAX_ATTEMPTS})`);
-                                setTimeout(() => {
-                                    forceLowestQuality(player, video, onComplete, {
-                                        ...retryOptions,
-                                        attempt: attempt + 1
-                                    });
-                                }, TIMING.QUALITY_RETRY_DELAY);
-                                return;
-                            }
-
-                            onComplete?.();
-                        }, TIMING.UI_INTERACTION_FINAL);
-                    });
-                } catch (uiError) {
-                    console.error('[Earmode] Error in quality UI fallback:', uiError);
-                    onComplete?.();
-                }
-            } else {
-                player.__audioModeQualityAttempted = true;
-                // API methods succeeded, signal completion
+            // The player API cannot be reached: the settings menu is the only way
+            if (!audioModeEnabled) {
                 onComplete?.();
+                return;
             }
 
-            // Restore playback state if it changed
-            restorePlaybackState();
-        }, TIMING.API_VERIFICATION_DELAY);
+            console.log(`[Earmode] No player API on attempt ${attempt}, using UI interaction...`);
+
+            try {
+                clickQuality('144p', () => {
+                    setTimeout(() => {
+                        const qualityAfterClick = getPlayerQuality(player);
+
+                        if (isAudioModeQuality(qualityAfterClick)) {
+                            player.__audioModeQualityAttempted = true;
+                            onComplete?.();
+                            return;
+                        }
+
+                        // Without a readable quality there is no way to tell that a retry is needed
+                        if (audioModeEnabled && qualityAfterClick && attempt < LOWEST_QUALITY_RETRY.MAX_ATTEMPTS) {
+                            console.log(`[Earmode] 144p was not applied after UI interaction; retrying (${attempt + 1}/${LOWEST_QUALITY_RETRY.MAX_ATTEMPTS})`);
+                            setTimeout(() => {
+                                forceLowestQuality(player, video, onComplete, {
+                                    ...retryOptions,
+                                    attempt: attempt + 1
+                                });
+                            }, TIMING.QUALITY_RETRY_DELAY);
+                            return;
+                        }
+
+                        onComplete?.();
+                    }, TIMING.UI_INTERACTION_FINAL);
+                });
+            } catch (uiError) {
+                console.error('[Earmode] Error in quality UI fallback:', uiError);
+                onComplete?.();
+            }
+        });
 
     } catch (error) {
         console.error('[Earmode] Error setting quality:', error);
@@ -1343,7 +1418,8 @@ const forceLowestQuality = (player, video, onComplete = null, options = {}) => {
  * Uses the central quality operation handler to prevent duplicate popups
  */
 function restoreQuality() {
-    requestQualityOperation('restore');
+    // No debounce: the sound is already off for the reload
+    requestQualityOperation('restore', 0);
 }
 
 /**
@@ -1353,7 +1429,7 @@ function restoreQuality() {
  * @param {number} attempts - Number of retry attempts remaining
  */
 const restoreQualityInternal = (onComplete = null, attempts = 3) => {
-    const player = document.getElementById('movie_player');
+    const player = getPlayer();
     const video = getVideoElement();
 
     if (!player || !video) {
@@ -1367,86 +1443,57 @@ const restoreQualityInternal = (onComplete = null, attempts = 3) => {
 
     // Load from storage to get user's preferred quality as fallback
     chrome.storage.sync.get(['preferredQuality'], (result) => {
-        try {
-            const availableLevels = player.getAvailableQualityLevels ? player.getAvailableQualityLevels() : [];
-
-            // Map quality codes to UI text for click fallback
-            const qualityToText = {
-                'hd2160': '2160p',
-                'hd1440': '1440p',
-                'hd1080': '1080p',
-                'hd720': '720p',
-                'large': '480p',
-                'medium': '360p',
-                'small': '240p',
-                'tiny': '144p',
-                'auto': 'Auto'
-            };
-
-            // Use the stored preference, then the quality from before audio mode, then 720p
-            // NEVER restore to audio mode qualities (tiny/small)
-            let target = result.preferredQuality;
-            if (!RESTORABLE_QUALITIES.has(target)) {
-                target = savedQualityBeforeAudioMode;
-            }
-            if (!RESTORABLE_QUALITIES.has(target)) {
-                // Last resort: 720p
-                target = QUALITY.RESTORE;
-            }
-            let uiTargetText = qualityToText[target] || '720p';
-
-            console.log('[Earmode] Restoring quality to:', target);
-
-            // If saved quality is not available, fallback to auto
-            if (availableLevels.length > 0 && !availableLevels.includes(target)) {
-                target = 'auto';
-                uiTargetText = 'Auto';
-            }
-
-            // Clear session saved quality after restoring (keep storage preference)
-            savedQualityBeforeAudioMode = null;
-
-            // Apply quality restoration using robust methods
-            if (player.setPlaybackQualityRange) {
-                // Clear any existing range constraint first (important for breaking manual locks)
-                player.setPlaybackQualityRange('auto', 'auto');
-
-                // Then set specific if not auto
-                if (target !== 'auto') {
-                    player.setPlaybackQualityRange(target, target);
+        whenQualityLevelsReady(player, levels => {
+            try {
+                // Use the stored preference, then the quality from before audio mode, then 720p
+                // NEVER restore to audio mode qualities (tiny/small), unless the video has nothing else
+                let wanted = result.preferredQuality;
+                if (!RESTORABLE_QUALITIES.has(wanted)) {
+                    wanted = savedQualityBeforeAudioMode;
                 }
-            }
+                if (!RESTORABLE_QUALITIES.has(wanted)) {
+                    // Last resort: 720p
+                    wanted = QUALITY.RESTORE;
+                }
 
-            if (player.setPlaybackQuality) {
-                player.setPlaybackQuality(target);
-            }
+                const target = resolveQuality(wanted, levels);
+                console.log('[Earmode] Restoring quality to:', target, 'wanted:', wanted);
 
-            if (player.setInternalQuality) {
-                player.setInternalQuality(target);
-            }
+                // Apply quality restoration using robust methods
+                if (player.setPlaybackQualityRange) {
+                    // Clear any existing range constraint first (important for breaking manual locks)
+                    player.setPlaybackQualityRange('auto', 'auto');
 
-            if (player.setPreferredQuality) {
-                player.setPreferredQuality(target);
-            }
+                    if (target !== 'auto') {
+                        player.setPlaybackQualityRange(target, target);
+                    } else {
+                        // Auto alone keeps the low quality until all of it has played, up to a
+                        // minute. Reload at a real quality, then let go of it.
+                        const reloadAt = resolveQuality(savedQualityBeforeAudioMode || QUALITY.RESTORE, levels);
+                        player.setPlaybackQualityRange(reloadAt, reloadAt);
+                        player.setPlaybackQualityRange('auto', 'auto');
+                    }
+                }
 
-            // VERIFY and FALLBACK
-            setTimeout(() => {
-                const currentQuality = player.getPlaybackQuality ? player.getPlaybackQuality() : 'unknown';
+                // Clear session saved quality after restoring (keep storage preference)
+                savedQualityBeforeAudioMode = null;
 
-                // If not successful yet, try UI click once
-                if (target !== 'auto' && currentQuality !== target) {
-                    // Use UI click with onComplete callback
-                    clickQualitySetting(video, uiTargetText, onComplete);
-                } else {
-                    // API methods succeeded
+                if (player.setPlaybackQuality) {
+                    player.setPlaybackQuality(target);
+                }
+
+                if (levels) {
                     onComplete?.();
+                    return;
                 }
-            }, 500);
 
-        } catch (e) {
-            console.error('[Earmode] Error restoring quality:', e);
-            onComplete?.();
-        }
+                // The player API cannot be reached: the settings menu is the only way
+                clickQualitySetting(QUALITY_TEXT[target], onComplete);
+            } catch (e) {
+                console.error('[Earmode] Error restoring quality:', e);
+                onComplete?.();
+            }
+        });
     });
 };
 
@@ -1522,7 +1569,7 @@ function checkAndEnforceQuality() {
     // Skip if a quality operation is already in progress to avoid duplicate popup
     if (qualityOperationInProgress) return;
 
-    const player = document.getElementById('movie_player');
+    const player = getPlayer();
     if (!player || !audioModeEnabled) return;
 
     const currentQuality = player.getPlaybackQuality ? player.getPlaybackQuality() : null;
@@ -1545,7 +1592,7 @@ function setLowestQuality() {
  * @param {Function} onComplete - Callback when operation completes
  */
 function setLowestQualityInternal(onComplete = null) {
-    const player = document.getElementById('movie_player');
+    const player = getPlayer();
     const video = getVideoElement();
 
     if (!player || !video) {

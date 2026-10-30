@@ -16,6 +16,9 @@ function createTimers() {
             return 1;
         },
         clearInterval() {},
+        runOne() {
+            queue.shift()?.();
+        },
         runAll(limit = 50) {
             let runs = 0;
             while (queue.length > 0) {
@@ -58,7 +61,6 @@ function loadContentScript(timers, { extraScripts = [], syncStorage = {}, syncGe
         },
         URLSearchParams,
         Image: class Image {},
-        KeyboardEvent: class KeyboardEvent {},
         MutationObserver: class MutationObserver {
             observe() {}
             disconnect() {}
@@ -118,6 +120,7 @@ function loadContentScript(timers, { extraScripts = [], syncStorage = {}, syncGe
                 sync: {
                     get(keys, callback) {
                         if (syncGet) return syncGet(keys, callback);
+                        if (!callback) return Promise.resolve({ ...syncStorage });
                         callback({ ...syncStorage });
                     },
                     set() {}
@@ -162,6 +165,7 @@ function loadContentScript(timers, { extraScripts = [], syncStorage = {}, syncGe
 globalThis.__audioModeTestApi = {
     forceLowestQuality,
     clickQualitySetting,
+    restoreQualityInternal,
     extractPageChannels,
     normalizePlayerLook,
     thumbnailUrl,
@@ -181,6 +185,9 @@ globalThis.__audioModeTestApi = {
     },
     setDocumentForTest(documentForTest) {
         globalThis.document = documentForTest;
+    },
+    setPlayerForTest(player) {
+        getPlayer = () => player;
     },
     setAudioModeEnabled(value) {
         audioModeEnabled = value;

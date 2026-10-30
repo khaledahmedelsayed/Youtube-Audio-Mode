@@ -42,6 +42,7 @@ node --test tests/
 - `manifest.json`: extension manifest (Manifest V3)
 - `background.js`: service worker and toolbar badge
 - `content.js`: runs on YouTube; quality switching, list matching and the player looks
+- `player-bridge.js`: runs in the page's own script world, where YouTube's player methods exist, and calls them for `content.js`
 - `player-menu.js`, `player-menu.css`: the Earmode button and menu on the player
 - `overlay.css`: styles for the player looks
 - `popup.html`, `popup.js`, `popup.css`: the toolbar popup

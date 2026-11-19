@@ -614,3 +614,26 @@ test('closed menu does not read the page for the channel', () => {
     ctx.renderPlayerMenu();
     assert.equal(reads, 0);
 });
+
+test('open menu shrinks to fit a short player instead of scrolling', () => {
+    const { ctx, player } = setupMenu();
+    ctx.ensurePlayerMenu();
+    const menu = menuOf(player);
+    let playerBottom = 300;
+    player.getBoundingClientRect = () => ({ bottom: playerBottom });
+    menu.getBoundingClientRect = () => ({ top: 106 });
+    menu.offsetHeight = 238;
+
+    ctx.setPlayerMenuOpen(true, false);
+    // (300 - 106 - 12) / 238
+    assert.equal(menu.style.props['--em-pm-scale'], '0.765');
+
+    playerBottom = 600;
+    ctx.fitPlayerMenu();
+    assert.equal(menu.style.props['--em-pm-scale'], undefined);
+
+    playerBottom = 300;
+    ctx.fitPlayerMenu();
+    ctx.setPlayerMenuOpen(false, false);
+    assert.equal(menu.style.props['--em-pm-scale'], undefined);
+});

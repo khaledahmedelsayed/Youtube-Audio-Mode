@@ -33,7 +33,8 @@
 /* ---------- button ---------- */
 .em-player-btn {
     position: absolute;
-    top: 12px;
+    /* Below YouTube's own top-right buttons (info cards, overflow), not on top of them */
+    top: 60px;
     left: auto;
     right: 12px;
     z-index: 65;
@@ -87,16 +88,15 @@
 /* ---------- menu ---------- */
 .em-player-menu {
     position: absolute;
-    top: 58px;
+    top: 106px;
     left: auto;
     right: 12px;
     z-index: 65;
     width: 268px;
     max-width: calc(100% - 24px);
-    max-height: calc(100% - 70px);
-    overflow-y: auto;
-    scrollbar-width: thin;
-    scrollbar-color: var(--em-pm-surface) transparent;
+    /* Never scrolls: on a short player, player-menu.js shrinks the whole menu to fit (--em-pm-scale) */
+    transform: scale(var(--em-pm-scale, 1));
+    transform-origin: top right;
     background: #1D1C24;
     color: var(--em-pm-ink);
     border-radius: 14px;
@@ -120,16 +120,19 @@ html[dir="rtl"] .em-player-menu {
     right: auto;
 }
 
+html[dir="rtl"] .em-player-menu {
+    transform-origin: top left;
+}
+
 /* Fullscreen and embeds show the video title at the top; sit below it */
 #movie_player.ytp-fullscreen > .em-player-btn,
 #movie_player.ytp-embed > .em-player-btn {
-    top: 64px;
+    top: 72px;
 }
 
 #movie_player.ytp-fullscreen > .em-player-menu,
 #movie_player.ytp-embed > .em-player-menu {
-    top: 110px;
-    max-height: calc(100% - 122px);
+    top: 118px;
 }
 
 .em-player-menu[hidden] {

@@ -43,6 +43,10 @@ let playerButtonEnabled = null;
 let playerMenuRules = null;
 let playerMenuListPending = false;
 let playerMenuListFailed = false;
+/** Refits the open menu when the player changes size (window resize, zoom, fullscreen, theater) */
+let playerMenuResizeObserver = null;
+/** Space kept free under the menu, in pixels */
+const PLAYER_MENU_BOTTOM_GAP = 12;
 
 /**
  * Labels and pressed states for the in-player button and menu
@@ -180,9 +184,15 @@ function setPlayerMenuOpen(open, returnFocus) {
         if (next) {
             document.addEventListener('click', playerMenuOutsideClick, true);
             document.addEventListener('keydown', playerMenuDocumentKeydown, true);
+            if (typeof ResizeObserver === 'function') {
+                playerMenuResizeObserver = new ResizeObserver(() => fitPlayerMenu());
+                playerMenuResizeObserver.observe(playerMenuEls.player);
+            }
         } else {
             document.removeEventListener('click', playerMenuOutsideClick, true);
             document.removeEventListener('keydown', playerMenuDocumentKeydown, true);
+            playerMenuResizeObserver?.disconnect();
+            playerMenuResizeObserver = null;
         }
     }
     renderPlayerMenu();
@@ -416,6 +426,25 @@ function renderPlayerMenu() {
         text.textContent = item.label;
         lookButton.setAttribute('aria-pressed', String(item.pressed));
     });
+
+    fitPlayerMenu();
+}
+
+/**
+ * Shrink the open menu so all of it shows inside the player, without a scrollbar.
+ * The scale only affects painting, so the menu's own height still reads unscaled.
+ */
+function fitPlayerMenu() {
+    const els = playerMenuEls;
+    if (!els) return;
+    const { menu, player } = els;
+    menu.style.removeProperty('--em-pm-scale');
+    if (!playerMenuOpen || typeof menu.getBoundingClientRect !== 'function' || !player) return;
+
+    const height = menu.offsetHeight;
+    const room = player.getBoundingClientRect().bottom - menu.getBoundingClientRect().top - PLAYER_MENU_BOTTOM_GAP;
+    if (!(height > 0) || !(room > 0) || height <= room) return;
+    menu.style.setProperty('--em-pm-scale', (room / height).toFixed(3));
 }
 
 /**
